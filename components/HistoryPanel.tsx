@@ -5,14 +5,19 @@ import HistoryIcon from './icons/HistoryIcon';
 interface HistoryPanelProps {
   history: HistoryItem[];
   onRestore: (item: HistoryItem) => void;
+  isLoading?: boolean;
 }
 
-const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, onRestore }) => {
+const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, onRestore, isLoading = false }) => {
   return (
     <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
       <h2 className="text-2xl font-semibold mb-4 text-slate-200">歷史紀錄</h2>
-      {history.length === 0 ? (
-        <p className="text-slate-500 text-center py-4">尚無歷史紀錄。產生圖片後，紀錄將會顯示於此。</p>
+      {isLoading ? (
+        <p className="text-slate-500 text-center py-4">載入中...</p>
+      ) : history.length === 0 ? (
+        <p className="text-slate-500 text-center py-4">
+          尚無歷史紀錄。產生圖片後，紀錄將會顯示於此。
+        </p>
       ) : (
         <ul className="space-y-3 max-h-96 overflow-y-auto pr-2">
           {history.map((item, index) => (

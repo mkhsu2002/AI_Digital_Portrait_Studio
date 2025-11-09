@@ -7,6 +7,9 @@ import Header from './components/Header';
 import PromptForm from './components/PromptForm';
 import PromptDisplay from './components/PromptDisplay';
 import HistoryPanel from './components/HistoryPanel';
+import AuthGate from './components/AuthGate';
+import { useAuth } from './contexts/AuthContext';
+import { addHistoryRecord, fetchUserHistory } from './services/historyService';
 
 // Fix: Defined the AIStudio interface globally to resolve a TypeScript error
 // about subsequent property declarations having conflicting types. This ensures
@@ -22,6 +25,7 @@ declare global {
 }
 
 const App: React.FC = () => {
+  const { user, initializing } = useAuth();
   const [formData, setFormData] = useState<FormDataState>({
     productName: '登山後背包',
     clothingStyle: CLOTHING_STYLES[8], // 戶外休閒風
@@ -43,6 +47,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState<boolean>(true);
 
 
   useEffect(() => {
@@ -100,10 +105,14 @@ The final output will be a set of three distinct, full-frame images from this sc
   }, []);
 
   const handleGenerate = useCallback(async () => {
+    if (!user) {
+      setError('請先登入後再產生圖片。');
+      return;
+    }
     setIsLoading(true);
     setError(null);
     setImages([]);
-
+    
     const basePrompt = `A professional fashion photoshoot featuring '${formData.productName}'.
 A ${formData.modelGender === '女性模特兒' ? 'female' : 'male'} model with a ${formData.clothingStyle} aesthetic is wearing clothing suitable for the ${formData.clothingSeason}.
 The setting is ${formData.background}.
@@ -184,15 +193,21 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
       setImages(imageResults);
 
       // Add to history
+      const historySnapshot: HistoryItem = {
+        formData: JSON.parse(JSON.stringify(formData)),
+        images: JSON.parse(JSON.stringify(imageResults)),
+      };
+
       setHistory(prevHistory => {
-        const newHistoryItem: HistoryItem = { formData, images: imageResults };
-        // Avoid adding a duplicate of the most recent entry.
-        if (prevHistory.length > 0 && JSON.stringify(prevHistory[0].formData) === JSON.stringify(formData)) {
-            return prevHistory;
-        }
-        const newHistory = [newHistoryItem, ...prevHistory];
-        return newHistory.slice(0, 10);
+        const newHistory = [historySnapshot, ...prevHistory].slice(0, 10);
+        return newHistory;
       });
+
+      try {
+        await addHistoryRecord(user.uid, historySnapshot);
+      } catch (historyError) {
+        console.error('儲存歷史紀錄失敗：', historyError);
+      }
 
     } catch (err) {
       console.error(err);
@@ -270,13 +285,45 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
             i === index ? { ...img, isGeneratingVideo: false, videoError: errorMessage } : img
         ));
     }
-}, [images, formData.aspectRatio]);
+}, [images, formData.aspectRatio, user]);
 
   const handleRestoreHistory = useCallback((item: HistoryItem) => {
     setFormData(item.formData);
     setImages(item.images);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (!user) {
+        setHistory([]);
+        setIsHistoryLoading(false);
+        return;
+      }
+      setIsHistoryLoading(true);
+      try {
+        const records = await fetchUserHistory(user.uid);
+        setHistory(records);
+      } catch (err) {
+        console.error('載入歷史紀錄失敗：', err);
+      } finally {
+        setIsHistoryLoading(false);
+      }
+    };
+    loadHistory();
+  }, [user]);
+
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center">
+        <p className="text-slate-400 text-lg">初始化中...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthGate />;
+  }
 
   return (
     <div className="bg-slate-900 min-h-screen text-slate-100 font-sans p-4 sm:p-6 md:p-8">
@@ -292,7 +339,7 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
               onGenerate={handleGenerate}
               isLoading={isLoading}
             />
-            <HistoryPanel history={history} onRestore={handleRestoreHistory} />
+            <HistoryPanel history={history} onRestore={handleRestoreHistory} isLoading={isHistoryLoading} />
           </div>
           <div className="sticky top-8">
             <PromptDisplay 

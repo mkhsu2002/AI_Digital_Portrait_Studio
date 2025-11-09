@@ -23,6 +23,8 @@ export interface ImageResult {
 }
 
 export interface HistoryItem {
+  id?: string;
   formData: FormDataState;
   images: ImageResult[];
+  createdAt?: number;
 }
