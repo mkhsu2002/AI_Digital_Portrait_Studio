@@ -253,9 +253,13 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
           }
           const blob = await imageResponse.blob();
           const base64 = await blobToBase64(blob);
+          const resolvedMimeType =
+            imagePart.fileData.mimeType ??
+            (blob.type ? blob.type : undefined) ??
+            "image/png";
           return {
             label: shot.label,
-            mimeType: imagePart.fileData.mimeType ?? blob.type || "image/png",
+            mimeType: resolvedMimeType,
             base64,
           };
         }
