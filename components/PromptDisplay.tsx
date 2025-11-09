@@ -13,7 +13,8 @@ interface PromptDisplayProps {
   productName: string;
   onGenerateVideo: (index: number) => void;
   aspectRatio: string;
-  onShare: (platform: 'facebook' | 'instagram') => void;
+  onShare: (platform: 'facebook' | 'instagram') => Promise<void>;
+  canShare: boolean;
 }
 
 const shareUrls = {
@@ -21,7 +22,7 @@ const shareUrls = {
   instagram: "https://www.instagram.com/",
 };
 
-const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompt, images, isLoading, error, productName, onGenerateVideo, aspectRatio, onShare }) => {
+const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompt, images, isLoading, error, productName, onGenerateVideo, aspectRatio, onShare, canShare }) => {
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
@@ -111,19 +112,19 @@ const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompt, images, isLoading
           <div className="grid grid-cols-2 gap-2 text-xs mt-4">
             <button
               onClick={() => {
-                onShare('facebook');
-                window.open(shareUrls.facebook, '_blank', 'noopener,noreferrer');
+                void onShare('facebook');
               }}
-              className="bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg transition-colors"
+              disabled={!canShare || isLoading}
+              className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white py-2 rounded-lg transition-colors"
             >
               分享到 Facebook
             </button>
             <button
               onClick={() => {
-                onShare('instagram');
-                window.open(shareUrls.instagram, '_blank', 'noopener,noreferrer');
+                void onShare('instagram');
               }}
-              className="bg-pink-600 hover:bg-pink-500 text-white py-2 rounded-lg transition-colors"
+              disabled={!canShare || isLoading}
+              className="bg-pink-600 hover:bg-pink-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white py-2 rounded-lg transition-colors"
             >
               分享到 Instagram
             </button>

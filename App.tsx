@@ -414,6 +414,7 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
       } catch (uploadError) {
         console.error("上傳歷史圖片失敗：", uploadError);
       }
+      setImages(storedImages);
 
       const historySnapshot: HistoryItem = {
         formData: sanitizeFormDataForHistory(formData),
@@ -525,15 +526,76 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
       setError('請先登入後再分享。');
       return;
     }
-    try {
-      const credits = await rewardCreditForShare(user.uid);
-      setRemainingCredits(credits);
-      setError(null);
-    } catch (shareError) {
-      console.error('分享獲得額度失敗：', shareError);
-      setError('無法更新生成次數，請稍後再試。');
+
+    const primaryImage = images[0];
+    if (!primaryImage) {
+      setError('目前沒有可分享的圖片，請先產生圖片。');
+      return;
     }
-  }, [user]);
+
+    const message = "生成 by FlyPig AI 人像攝影棚 https://studio.icareu.tw/ #FlyPigAI";
+
+    const getBlobFromSrc = async (src: string) => {
+      if (src.startsWith('data:')) {
+        const response = await fetch(src);
+        return response.blob();
+      }
+      const response = await fetch(src);
+      return response.blob();
+    };
+
+    const tryWebShare = async () => {
+      try {
+        const blob = await getBlobFromSrc(primaryImage.src);
+        const file = new File([blob], `flypig-ai-${Date.now()}.png`, { type: blob.type || 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], text: message });
+          return true;
+        }
+        if (navigator.share) {
+          await navigator.share({ text: message });
+          return true;
+        }
+      } catch (err) {
+        console.error('Web Share 失敗：', err);
+      }
+      return false;
+    };
+
+    const completeShareReward = async () => {
+      try {
+        const credits = await rewardCreditForShare(user.uid);
+        setRemainingCredits(credits);
+      } catch (shareError) {
+        console.error('分享獲得額度失敗：', shareError);
+      }
+    };
+
+    if (platform === 'instagram') {
+      const shared = await tryWebShare();
+      if (!shared) {
+        window.alert('Instagram 分享需要支援 Web Share 的裝置或瀏覽器。分享文字已複製，請自行貼上。');
+        try {
+          await navigator.clipboard.writeText(message);
+        } catch (clipboardError) {
+          console.error('複製分享文字失敗：', clipboardError);
+        }
+        window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
+      }
+      await completeShareReward();
+      return;
+    }
+
+    // Facebook
+    const webShared = await tryWebShare();
+    if (!webShared) {
+      const url = new URL('https://www.facebook.com/sharer/sharer.php');
+      url.searchParams.set('u', primaryImage.src);
+      url.searchParams.set('quote', message);
+      window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    }
+    await completeShareReward();
+  }, [user, images]);
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -613,6 +675,7 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
               onGenerateVideo={handleGenerateVideo}
               aspectRatio={formData.aspectRatio}
               onShare={handleShare}
+              canShare={images.length > 0}
             />
           </div>
         </main>
