@@ -14,7 +14,7 @@ import { db } from "../firebase";
 const getHistoryCollectionRef = (uid: string) => collection(db, "users", uid, "history");
 
 export const fetchUserHistory = async (uid: string): Promise<HistoryItem[]> => {
-  const q = query(getHistoryCollectionRef(uid), orderBy("createdAt", "desc"), limit(10));
+  const q = query(getHistoryCollectionRef(uid), orderBy("createdAt", "desc"), limit(5));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((doc) => {
     const data = doc.data() as DocumentData;
