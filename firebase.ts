@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import type { FirebaseStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -16,12 +16,27 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = (() => {
-  try {
-    return getStorage(app);
-  } catch (err) {
-    console.warn("Firebase Storage 初始化失敗。請確認已設定 storageBucket。", err);
+
+let storagePromise: Promise<FirebaseStorage | null> | null = null;
+
+export const ensureStorage = async (): Promise<FirebaseStorage | null> => {
+  if (!app.options.storageBucket) {
+    console.warn("Firebase Storage 未設定 storageBucket，跳過初始化。");
     return null;
   }
-})();
+
+  if (!storagePromise) {
+    storagePromise = (async () => {
+      try {
+        const { getStorage } = await import("firebase/storage");
+        return getStorage(app);
+      } catch (err) {
+        console.warn("Firebase Storage 初始化失敗。請確認配置是否完整。", err);
+        return null;
+      }
+    })();
+  }
+
+  return storagePromise;
+};
 

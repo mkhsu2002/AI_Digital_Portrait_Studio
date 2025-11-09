@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import type { FormDataState, ImageResult, HistoryItem } from './types';
 import { CLOTHING_STYLES, EXPRESSIONS, LENSES, LIGHTING_CONDITIONS, ASPECT_RATIOS, BACKGROUNDS, CLOTHING_SEASONS, POSES, MODEL_GENDERS } from './constants';
 import Header from './components/Header';
@@ -11,7 +10,7 @@ import HistoryPanel from './components/HistoryPanel';
 import AuthGate from './components/AuthGate';
 import { useAuth } from './contexts/AuthContext';
 import { addHistoryRecord, fetchUserHistory } from './services/historyService';
-import { storage } from "./firebase";
+import { ensureStorage } from "./firebase";
 
 const GEMINI_API_KEY = import.meta.env.VITE_API_KEY ?? '';
 
@@ -109,9 +108,12 @@ The final output will be a set of three distinct, full-frame images from this sc
   }, []);
 
   const uploadHistoryImages = useCallback(async (uid: string, images: ImageResult[]): Promise<ImageResult[]> => {
-    if (!storage) {
+    const storageInstance = await ensureStorage();
+    if (!storageInstance) {
       throw new Error("尚未設定 Firebase Storage，請先於環境變數配置 storageBucket。");
     }
+
+    const { ref, uploadString, getDownloadURL } = await import("firebase/storage");
 
     const timestamp = Date.now();
     const uploadedImages = await Promise.all(
@@ -124,7 +126,7 @@ The final output will be a set of three distinct, full-frame images from this sc
         const mimeTypeFromDataUrl = dataUrlMatch?.[1] ?? "image/png";
         const extensionRaw = mimeTypeFromDataUrl.split("/")[1]?.toLowerCase() ?? "png";
         const extension = extensionRaw === "jpeg" ? "jpg" : extensionRaw;
-        const storageRef = ref(storage, `users/${uid}/history/${timestamp}-${index}.${extension}`);
+        const storageRef = ref(storageInstance, `users/${uid}/history/${timestamp}-${index}.${extension}`);
 
         await uploadString(storageRef, image.src, "data_url");
         const downloadUrl = await getDownloadURL(storageRef);
