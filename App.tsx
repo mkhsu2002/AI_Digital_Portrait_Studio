@@ -70,7 +70,7 @@ The final output will be a set of three distinct, full-frame images from this sc
 2. A medium shot (from the waist up).
 3. A close-up shot (head and shoulders).`;
     setGeneratedPrompt(prompt);
-  }, [formData, user, uploadHistoryImages]);
+  }, [formData, user]);
 
   const handleFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
