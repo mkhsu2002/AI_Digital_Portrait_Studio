@@ -332,14 +332,6 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
       }));
       setImages(imageResults);
 
-      let storedImages: ImageResult[] = [];
-      try {
-        storedImages = await uploadHistoryImages(user.uid, imageResults);
-      } catch (uploadError) {
-        console.error("上傳歷史圖片失敗：", uploadError);
-        throw new Error("圖片儲存失敗，請稍後再試。");
-      }
-
       let storedImages: ImageResult[] = imageResults;
       try {
         storedImages = await uploadHistoryImages(user.uid, imageResults);
@@ -367,7 +359,7 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
     } finally {
       setIsLoading(false);
     }
-  }, [formData, user]);
+  }, [formData, user, uploadHistoryImages]);
 
   const handleGenerateVideo = useCallback(async (index: number) => {
     setImages(prev => prev.map((img, i) => 
