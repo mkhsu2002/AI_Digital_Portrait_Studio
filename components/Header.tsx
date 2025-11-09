@@ -1,7 +1,18 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  remainingCredits: number | null;
+  isQuotaLoading: boolean;
+}
+
+const formatCredits = (credits: number | null, isLoading: boolean) => {
+  if (isLoading) return "讀取中...";
+  if (credits === null) return "--";
+  return `${credits}`;
+};
+
+const Header: React.FC<HeaderProps> = ({ remainingCredits, isQuotaLoading }) => {
   const { user, logout } = useAuth();
 
   return (
@@ -18,7 +29,9 @@ const Header: React.FC = () => {
         <div className="self-center sm:self-auto bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 flex flex-col sm:flex-row gap-2 sm:items-center">
           <div>
             <p className="font-semibold">歡迎，{user.email}</p>
-            <p className="text-slate-400 text-xs">您的歷史紀錄將與此帳號綁定。</p>
+            <p className="text-slate-400 text-xs">
+              剩餘生成次數：{formatCredits(remainingCredits, isQuotaLoading)}（分享一次可增加一次機會）
+            </p>
           </div>
           <button
             onClick={logout}

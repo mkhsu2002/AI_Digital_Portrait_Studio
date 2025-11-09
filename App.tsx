@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
-import type { FormDataState, ImageResult, HistoryItem } from './types';
+import type { FormDataState, ImageResult, HistoryItem, HistoryFormData } from './types';
 import { CLOTHING_STYLES, EXPRESSIONS, LENSES, LIGHTING_CONDITIONS, ASPECT_RATIOS, BACKGROUNDS, CLOTHING_SEASONS, POSES, MODEL_GENDERS } from './constants';
 import Header from './components/Header';
 import PromptForm from './components/PromptForm';
@@ -12,6 +12,7 @@ import { useAuth } from './contexts/AuthContext';
 import { addHistoryRecord, fetchUserHistory } from './services/historyService';
 import { storage } from "./firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
+import { fetchGenerationQuota, consumeGenerationCredit, rewardCreditForShare } from './services/usageService';
 
 const GEMINI_API_KEY = import.meta.env.VITE_API_KEY ?? '';
 
@@ -52,6 +53,8 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState<boolean>(true);
+  const [remainingCredits, setRemainingCredits] = useState<number | null>(null);
+  const [isQuotaLoading, setIsQuotaLoading] = useState<boolean>(true);
 
 
   useEffect(() => {
@@ -108,6 +111,56 @@ The final output will be a set of three distinct, full-frame images from this sc
       }
   }, []);
 
+  const sanitizeFormDataForHistory = useCallback(
+    (data: FormDataState): HistoryFormData => ({
+      productName: data.productName,
+      clothingStyle: data.clothingStyle,
+      clothingSeason: data.clothingSeason,
+      modelGender: data.modelGender,
+      background: data.background,
+      expression: data.expression,
+      pose: data.pose,
+      lens: data.lens,
+      lighting: data.lighting,
+      aspectRatio: data.aspectRatio,
+      additionalDescription: data.additionalDescription,
+      faceImage: data.faceImage
+        ? {
+            name: data.faceImage.name,
+            mimeType: data.faceImage.mimeType,
+            hasData: !!data.faceImage.data,
+          }
+        : null,
+      objectImage: data.objectImage
+        ? {
+            name: data.objectImage.name,
+            mimeType: data.objectImage.mimeType,
+            hasData: !!data.objectImage.data,
+          }
+        : null,
+    }),
+    []
+  );
+
+  const restoreFormDataFromHistory = useCallback(
+    (historyData: HistoryFormData): FormDataState => ({
+      productName: historyData.productName,
+      clothingStyle: historyData.clothingStyle,
+      clothingSeason: historyData.clothingSeason,
+      modelGender: historyData.modelGender,
+      background: historyData.background,
+      expression: historyData.expression,
+      pose: historyData.pose,
+      lens: historyData.lens,
+      lighting: historyData.lighting,
+      aspectRatio: historyData.aspectRatio,
+      additionalDescription: historyData.additionalDescription,
+      faceImage: null,
+      objectImage: null,
+    }),
+    []
+  );
+
   const uploadHistoryImages = useCallback(async (uid: string, images: ImageResult[]): Promise<ImageResult[]> => {
     if (!storage) {
       console.warn("Firebase Storage 尚未初始化，歷史紀錄將以 base64 儲存。");
@@ -140,20 +193,42 @@ The final output will be a set of three distinct, full-frame images from this sc
   }, []);
 
   const handleGenerate = useCallback(async () => {
-    setIsLoading(true);
+    if (isLoading) {
+      return;
+    }
+
     setError(null);
-    setImages([]);
-    
+
     if (!user) {
       setError('請先登入後再產生圖片。');
-      setIsLoading(false);
       return;
     }
     if (!GEMINI_API_KEY) {
       setError('尚未設定 Gemini API Key，請於環境變數新增 VITE_API_KEY。');
-      setIsLoading(false);
       return;
     }
+    if (remainingCredits !== null && remainingCredits <= 0) {
+      setError('您的生成次數已用完，分享作品即可獲得額外生成機會。');
+      return;
+    }
+
+    let creditsAfterConsume = remainingCredits ?? null;
+    try {
+      creditsAfterConsume = await consumeGenerationCredit(user.uid);
+      setRemainingCredits(creditsAfterConsume);
+    } catch (consumeError) {
+      if (consumeError instanceof Error && consumeError.message === "NO_CREDITS") {
+        setError('您的生成次數已用完，分享作品即可獲得額外生成機會。');
+      } else {
+        console.error('扣除生成次數失敗：', consumeError);
+        setError('無法確認生成次數，請稍後再試。');
+      }
+      return;
+    }
+
+    setIsLoading(true);
+    setImages([]);
+    
     const basePrompt = `A professional fashion photoshoot featuring '${formData.productName}'.
 A ${formData.modelGender === '女性模特兒' ? 'female' : 'male'} model with a ${formData.clothingStyle} aesthetic is wearing clothing suitable for the ${formData.clothingSeason}.
 The setting is ${formData.background}.
@@ -341,7 +416,7 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
       }
 
       const historySnapshot: HistoryItem = {
-        formData: JSON.parse(JSON.stringify(formData)),
+        formData: sanitizeFormDataForHistory(formData),
         images: JSON.parse(JSON.stringify(storedImages)),
       };
 
@@ -350,9 +425,11 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
         return newHistory;
       });
 
-      addHistoryRecord(user.uid, historySnapshot).catch((historyError) => {
+      try {
+        await addHistoryRecord(user.uid, historySnapshot);
+      } catch (historyError) {
         console.error('儲存歷史紀錄失敗：', historyError);
-      });
+      }
 
     } catch (err) {
       console.error(err);
@@ -360,7 +437,7 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
     } finally {
       setIsLoading(false);
     }
-  }, [formData, user, uploadHistoryImages]);
+  }, [formData, user, uploadHistoryImages, sanitizeFormDataForHistory, remainingCredits, isLoading]);
 
   const handleGenerateVideo = useCallback(async (index: number) => {
     setImages(prev => prev.map((img, i) => 
@@ -436,10 +513,31 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
 }, [images, formData.aspectRatio]);
 
   const handleRestoreHistory = useCallback((item: HistoryItem) => {
-    setFormData(item.formData);
+    const restored = restoreFormDataFromHistory(item.formData);
+    setFormData(restored);
     setImages(item.images);
+    if (item.formData.faceImage?.hasData || item.formData.objectImage?.hasData) {
+      setError("此歷史紀錄包含參考圖片，請重新上傳參考檔案後再產生。");
+    } else {
+      setError(null);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  }, [restoreFormDataFromHistory]);
+
+  const handleShare = useCallback(async (platform: 'facebook' | 'instagram') => {
+    if (!user) {
+      setError('請先登入後再分享。');
+      return;
+    }
+    try {
+      const credits = await rewardCreditForShare(user.uid);
+      setRemainingCredits(credits);
+      setError(null);
+    } catch (shareError) {
+      console.error('分享獲得額度失敗：', shareError);
+      setError('無法更新生成次數，請稍後再試。');
+    }
+  }, [user]);
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -461,6 +559,26 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
     loadHistory();
   }, [user]);
 
+  useEffect(() => {
+    const loadQuota = async () => {
+      if (!user) {
+        setRemainingCredits(null);
+        setIsQuotaLoading(false);
+        return;
+      }
+      setIsQuotaLoading(true);
+      try {
+        const usage = await fetchGenerationQuota(user.uid);
+        setRemainingCredits(usage.generationCredits);
+      } catch (quotaError) {
+        console.error('載入生成額度失敗：', quotaError);
+      } finally {
+        setIsQuotaLoading(false);
+      }
+    };
+    loadQuota();
+  }, [user]);
+
   if (initializing) {
     return (
       <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center">
@@ -476,7 +594,7 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
   return (
     <div className="bg-slate-900 min-h-screen text-slate-100 font-sans p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <Header />
+        <Header remainingCredits={remainingCredits} isQuotaLoading={isQuotaLoading} />
         <main className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           <div className="flex flex-col gap-8">
             <PromptForm 
@@ -498,6 +616,7 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
               productName={formData.productName}
               onGenerateVideo={handleGenerateVideo}
               aspectRatio={formData.aspectRatio}
+              onShare={handleShare}
             />
           </div>
         </main>
