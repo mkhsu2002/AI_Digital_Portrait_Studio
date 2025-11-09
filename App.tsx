@@ -515,12 +515,8 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
   const handleRestoreHistory = useCallback((item: HistoryItem) => {
     const restored = restoreFormDataFromHistory(item.formData);
     setFormData(restored);
-    setImages(item.images);
-    if (item.formData.faceImage?.hasData || item.formData.objectImage?.hasData) {
-      setError("此歷史紀錄包含參考圖片，請重新上傳參考檔案後再產生。");
-    } else {
-      setError(null);
-    }
+    setImages([]);
+    setError(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [restoreFormDataFromHistory]);
 
