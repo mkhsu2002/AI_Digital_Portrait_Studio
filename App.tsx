@@ -174,18 +174,38 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
       });
 
       const responses = await Promise.all(imagePromises);
-      const generatedImages = responses.map(({response, label}) => {
-          const imagePart = response.candidates[0].content.parts.find(part => part.inlineData);
-          if (!imagePart || !imagePart.inlineData) {
-              throw new Error('API 未能針對其中一個視角回傳圖片。');
-          }
-          return {
-            src: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
-            label,
-            videoSrc: null,
-            isGeneratingVideo: false,
-            videoError: null,
-          };
+      const generatedImages = responses.map(({ response, label }) => {
+        const candidates =
+          response.candidates ??
+          ((response as unknown as { response?: { candidates?: typeof response.candidates } }).response?.candidates ??
+            null);
+        const candidate = candidates?.[0] ?? null;
+        const parts = candidate?.content?.parts;
+
+        if (!parts || parts.length === 0) {
+          const blockReason =
+            response.promptFeedback?.blockReason ??
+            response.promptFeedback?.safetyRatings?.[0]?.category;
+          throw new Error(
+            blockReason
+              ? `模型拒絕生成圖片：${blockReason}。`
+              : "API 未回傳任何圖片資料，請稍後再試。"
+          );
+        }
+
+        const imagePart = parts.find((part) => part.inlineData);
+
+        if (!imagePart || !imagePart.inlineData) {
+          throw new Error("API 未能針對其中一個視角回傳圖片。");
+        }
+
+        return {
+          src: `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`,
+          label,
+          videoSrc: null,
+          isGeneratingVideo: false,
+          videoError: null,
+        };
       });
       
       if (generatedImages.length !== 3) {
