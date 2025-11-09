@@ -10,7 +10,6 @@ import HistoryPanel from './components/HistoryPanel';
 import AuthGate from './components/AuthGate';
 import { useAuth } from './contexts/AuthContext';
 import { addHistoryRecord, fetchUserHistory } from './services/historyService';
-import { ensureStorage } from "./firebase";
 
 const GEMINI_API_KEY = import.meta.env.VITE_API_KEY ?? '';
 
@@ -69,7 +68,7 @@ The final output will be a set of three distinct, full-frame images from this sc
 2. A medium shot (from the waist up).
 3. A close-up shot (head and shoulders).`;
     setGeneratedPrompt(prompt);
-  }, [formData, user, uploadHistoryImages]);
+  }, [formData, user]);
 
   const handleFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -105,39 +104,6 @@ The final output will be a set of three distinct, full-frame images from this sc
       if (input) {
           input.value = '';
       }
-  }, []);
-
-  const uploadHistoryImages = useCallback(async (uid: string, images: ImageResult[]): Promise<ImageResult[]> => {
-    const storageInstance = await ensureStorage();
-    if (!storageInstance) {
-      throw new Error("尚未設定 Firebase Storage，請先於環境變數配置 storageBucket。");
-    }
-
-    const { ref, uploadString, getDownloadURL } = await import("firebase/storage");
-
-    const timestamp = Date.now();
-    const uploadedImages = await Promise.all(
-      images.map(async (image, index) => {
-        if (!image.src.startsWith("data:")) {
-          return image;
-        }
-
-        const dataUrlMatch = image.src.match(/^data:(image\/[a-zA-Z0-9+.+-]+);base64,/);
-        const mimeTypeFromDataUrl = dataUrlMatch?.[1] ?? "image/png";
-        const extensionRaw = mimeTypeFromDataUrl.split("/")[1]?.toLowerCase() ?? "png";
-        const extension = extensionRaw === "jpeg" ? "jpg" : extensionRaw;
-        const storageRef = ref(storageInstance, `users/${uid}/history/${timestamp}-${index}.${extension}`);
-
-        await uploadString(storageRef, image.src, "data_url");
-        const downloadUrl = await getDownloadURL(storageRef);
-
-        return {
-          ...image,
-          src: downloadUrl,
-        };
-      })
-    );
-    return uploadedImages;
   }, []);
 
   const handleGenerate = useCallback(async () => {
@@ -344,7 +310,7 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
 
       const historySnapshot: HistoryItem = {
         formData: JSON.parse(JSON.stringify(formData)),
-        images: JSON.parse(JSON.stringify(storedImages)),
+        images: JSON.parse(JSON.stringify(imageResults)),
       };
 
       setHistory(prevHistory => {
