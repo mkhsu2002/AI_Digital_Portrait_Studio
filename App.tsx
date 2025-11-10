@@ -328,7 +328,10 @@ The final output will be a set of three distinct, full-frame images from this sc
 
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash-image",
-          contents: { parts },
+          contents: [{
+            role: 'user',
+            parts,
+          }],
           config: {
             responseModalities: [Modality.IMAGE],
             imageConfig: {
@@ -499,18 +502,25 @@ The final output will be a set of three distinct, full-frame images from this sc
                 throw new Error('下載圖片失敗，無法生成動畫。');
             }
             const blob = await response.blob();
-            const arrayBuffer = await blob.arrayBuffer();
-            const uint8Array = new Uint8Array(arrayBuffer);
-            let binary = '';
-            const chunkSize = 0x8000;
-            for (let i = 0; i < uint8Array.length; i += chunkSize) {
-                const chunk = uint8Array.subarray(i, i + chunkSize);
-                binary += String.fromCharCode(...chunk);
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    if (typeof reader.result === 'string') {
+                        resolve(reader.result);
+                    } else {
+                        reject(new Error('無法讀取圖片資料。'));
+                    }
+                };
+                reader.onerror = () => reject(reader.error ?? new Error('無法讀取圖片資料。'));
+                reader.readAsDataURL(blob);
+            });
+            const match = dataUrl.match(/^data:(.*);base64,(.*)$/);
+            if (!match) {
+                throw new Error('無法解析圖片資料。');
             }
-            const bytes = btoa(binary);
             return {
-                imageBytes: bytes,
-                mimeType: blob.type || 'image/jpeg',
+                imageBytes: match[2],
+                mimeType: match[1] || blob.type || 'image/jpeg',
             };
         };
 
