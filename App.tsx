@@ -12,7 +12,7 @@ import { useAuth } from './contexts/AuthContext';
 import { addHistoryRecord, fetchUserHistory } from './services/historyService';
 import { storage } from "./firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { fetchGenerationQuota, consumeGenerationCredit, rewardCreditForShare } from './services/usageService';
+import { fetchGenerationQuota, consumeGenerationCredit } from './services/usageService';
 
 const GEMINI_API_KEY = import.meta.env.VITE_API_KEY ?? '';
 
@@ -521,94 +521,6 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [restoreFormDataFromHistory]);
 
-  const handleFacebookShare = useCallback(async () => {
-    if (!user) {
-      window.alert('請先登入後再分享。');
-      return;
-    }
-
-    const primaryImage = images[0];
-    if (!primaryImage) {
-      window.alert('目前沒有可分享的圖片，請先產生圖片。');
-      return;
-    }
-
-    const message = "生成 by FlyPig AI 人像攝影棚 https://studio.icareu.tw/ #FlyPigAI";
-
-    const getBlobFromSrc = async (src: string) => {
-      if (src.startsWith('data:')) {
-        const response = await fetch(src);
-        return response.blob();
-      }
-      const response = await fetch(src);
-      return response.blob();
-    };
-
-    const rewardShare = async () => {
-      try {
-        const credits = await rewardCreditForShare(user.uid);
-        setRemainingCredits(credits);
-      } catch (shareError) {
-        console.error('分享獲得額度失敗：', shareError);
-      }
-    };
-
-    const tryWebShare = async (): Promise<'shared' | 'cancelled' | 'unsupported'> => {
-      try {
-        const blob = await getBlobFromSrc(primaryImage.src);
-        const file = new File([blob], `flypig-ai-${Date.now()}.png`, { type: blob.type || 'image/png' });
-        if (navigator.canShare && navigator.canShare({ files: [file], text: message })) {
-          await navigator.share({ files: [file], text: message, title: 'FlyPig AI 作品分享' });
-          return 'shared';
-        }
-        if (navigator.share) {
-          await navigator.share({ text: message, title: 'FlyPig AI 作品分享' });
-          return 'shared';
-        }
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          return 'cancelled';
-        }
-        console.error('Web Share 失敗：', err);
-      }
-      return 'unsupported';
-    };
-
-    const shareResult = await tryWebShare();
-    if (shareResult === 'shared') {
-      await rewardShare();
-      return;
-    }
-    if (shareResult === 'cancelled') {
-      return;
-    }
-
-    if (primaryImage.src.startsWith('data:')) {
-      window.alert('圖片尚未同步至雲端，已為您複製分享文字，請先下載圖片後再自行上傳到 Facebook。');
-      try {
-        await navigator.clipboard.writeText(message);
-      } catch (clipboardError) {
-        console.error('複製分享文字失敗：', clipboardError);
-      }
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(message);
-    } catch (clipboardError) {
-      console.error('複製分享文字失敗：', clipboardError);
-    }
-
-    const url = new URL('https://www.facebook.com/sharer/sharer.php');
-    url.searchParams.set('u', 'https://studio.icareu.tw/');
-    url.searchParams.set('quote', message);
-    url.searchParams.set('hashtag', '#FlyPigAI');
-    window.open(url.toString(), '_blank', 'noopener,noreferrer');
-
-    await rewardShare();
-  }, [user, images]);
-
-
   useEffect(() => {
     const loadHistory = async () => {
       if (!user) {
@@ -685,8 +597,6 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
               error={error}
               productName={formData.productName}
               onGenerateVideo={handleGenerateVideo}
-              onShareFacebook={handleFacebookShare}
-              canShare={images.length > 0}
             />
           </div>
         </main>

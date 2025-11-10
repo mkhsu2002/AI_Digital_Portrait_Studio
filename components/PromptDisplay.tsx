@@ -12,11 +12,9 @@ interface PromptDisplayProps {
   error: string | null;
   productName: string;
   onGenerateVideo: (index: number) => void;
-  onShareFacebook: () => Promise<void>;
-  canShare: boolean;
 }
 
-const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompt, images, isLoading, error, productName, onGenerateVideo, onShareFacebook, canShare }) => {
+const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompt, images, isLoading, error, productName, onGenerateVideo }) => {
   const [isCopied, setIsCopied] = useState(false);
 
   const handleDownload = useCallback(async (fileUrl: string, filename: string) => {
@@ -115,17 +113,6 @@ const PromptDisplay: React.FC<PromptDisplayProps> = ({ prompt, images, isLoading
               </div>
             );
           })}
-          <div className="grid grid-cols-1 gap-2 text-xs mt-4">
-            <button
-              onClick={() => {
-                void onShareFacebook();
-              }}
-              disabled={!canShare || isLoading}
-              className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white py-2 rounded-lg transition-colors"
-            >
-              分享到 Facebook
-            </button>
-          </div>
         </div>
       );
     }
