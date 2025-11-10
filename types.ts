@@ -40,9 +40,12 @@ export interface HistoryFormData {
   objectImage: HistoryImageMetadata | null;
 }
 
+export type ShotLabelKey = "fullBody" | "medium" | "closeUp";
+
 export interface ImageResult {
   src: string;
   label: string;
+  labelKey?: ShotLabelKey;
   videoSrc: string | null;
   isGeneratingVideo: boolean;
   videoError: string | null;

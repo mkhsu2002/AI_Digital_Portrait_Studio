@@ -23,26 +23,20 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const sanitizeEmail = (email: string) => email.trim().toLowerCase();
 
 const mapAuthError = (error: AuthError): Error => {
-  const code = error.code;
-  switch (code) {
-    case 'auth/invalid-email':
-      return new Error('電子郵件格式不正確，請重新輸入。');
-    case 'auth/user-disabled':
-      return new Error('此帳號已被停用，請聯絡管理員。');
-    case 'auth/user-not-found':
-      return new Error('找不到相符的帳號，請確認是否已註冊。');
-    case 'auth/wrong-password':
-    case 'auth/invalid-credential':
-      return new Error('帳號或密碼錯誤，請重新確認。');
-    case 'auth/email-already-in-use':
-      return new Error('此電子郵件已被註冊，請直接登入或使用其他信箱。');
-    case 'auth/weak-password':
-      return new Error('密碼強度不足，請至少輸入六個字元。');
+  const knownCode = error.code ?? "auth/generic";
+  switch (knownCode) {
+    case "auth/invalid-email":
+    case "auth/user-disabled":
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+    case "auth/email-already-in-use":
+    case "auth/weak-password":
+      return new Error(knownCode);
     default:
-      return new Error(error.message || '操作失敗，請稍後再試。');
+      return new Error("auth/generic");
   }
 };
-
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -102,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = (): AuthContextValue => {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error("useAuth 必須在 AuthProvider 內使用");
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return ctx;
 };

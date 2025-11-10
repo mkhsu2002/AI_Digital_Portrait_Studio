@@ -1,6 +1,7 @@
 # AI Digital Portrait Studio
 
 「電商人像攝影棚」是一套基於 React + Vite 的網頁應用，整合 Google Gemini 影像模型與 Firebase 服務，協助品牌快速生成多視角的人像商品圖。專案已開源，歡迎自行部署並依需求調整。
+英語說明（English Guide）：[README.en.md](./README.en.md)
 
 ## 核心功能
 

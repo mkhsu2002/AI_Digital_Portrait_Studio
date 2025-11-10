@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
-import type { FormDataState, ImageResult, HistoryItem, HistoryFormData } from './types';
+import type { FormDataState, ImageResult, HistoryItem, HistoryFormData, ShotLabelKey } from './types';
 import { CLOTHING_STYLES, EXPRESSIONS, LIGHTING_CONDITIONS, ASPECT_RATIOS, BACKGROUNDS, CLOTHING_SEASONS, POSES, MODEL_GENDERS } from './constants';
 import Header from './components/Header';
 import PromptForm from './components/PromptForm';
@@ -9,6 +9,7 @@ import PromptDisplay from './components/PromptDisplay';
 import HistoryPanel from './components/HistoryPanel';
 import AuthGate from './components/AuthGate';
 import { useAuth } from './contexts/AuthContext';
+import { TranslationProvider, useTranslation } from './contexts/TranslationContext';
 import { addHistoryRecord, fetchUserHistory } from './services/historyService';
 import { storage } from "./firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -29,8 +30,9 @@ declare global {
   }
 }
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const { user, initializing } = useAuth();
+  const { t, translateOption, translateShotLabel } = useTranslation();
   const [formData, setFormData] = useState<FormDataState>({
     productName: '登山後背包',
     clothingStyle: CLOTHING_STYLES[8], // 戶外休閒風
@@ -159,7 +161,7 @@ The final output will be a set of three distinct, full-frame images from this sc
 
   const uploadHistoryImages = useCallback(async (uid: string, images: ImageResult[]): Promise<ImageResult[]> => {
     if (!storage) {
-      console.warn("Firebase Storage 尚未初始化，歷史紀錄將以 base64 儲存。");
+      console.warn("Firebase Storage is not initialised; history items will keep base64 data.");
       return images;
     }
 
@@ -196,23 +198,15 @@ The final output will be a set of three distinct, full-frame images from this sc
     setError(null);
 
     if (!user) {
-      setError('請先登入後再產生圖片。');
+      setError(t.errors.mustLogin);
       return;
     }
     if (!GEMINI_API_KEY) {
-      setError('尚未設定 Gemini API Key，請於環境變數新增 VITE_API_KEY。');
+      setError(t.errors.missingApiKey);
       return;
     }
     if (remainingCredits !== null && remainingCredits <= 0) {
-      setError(`您的免費生成次數已用完。
-
-若生成的作品滿意，歡迎 FB 分享推薦 https://studio.icareu.tw/
-
-本應用服務目前已於 GitHub 免費開源，歡迎自行部署。
-
-使用時請遵守開源協議。
-
-若有委外部署 or 客製化選項需求，請來信 flypig@icareu.tw`);
+      setError(t.errors.quotaExhausted);
       return;
     }
 
@@ -222,18 +216,10 @@ The final output will be a set of three distinct, full-frame images from this sc
       setRemainingCredits(creditsAfterConsume);
     } catch (consumeError) {
       if (consumeError instanceof Error && consumeError.message === "NO_CREDITS") {
-        setError(`您的免費生成次數已用完。
-
-若生成的作品滿意，歡迎 FB 分享推薦 https://studio.icareu.tw/
-
-本應用服務目前已於 GitHub 免費開源，歡迎自行部署。
-
-使用時請遵守開源協議。
-
-若有委外部署 or 客製化選項需求，請來信 flypig@icareu.tw`);
+        setError(t.errors.quotaExhausted);
       } else {
-        console.error('扣除生成次數失敗：', consumeError);
-        setError('無法確認生成次數，請稍後再試。');
+        console.error("Failed to deduct generation credit:", consumeError);
+        setError(t.errors.consumeFailed);
       }
       return;
     }
@@ -251,10 +237,10 @@ The final output will be a set of three distinct, full-frame images from this sc
 2. A medium shot (from the waist up).
 3. A close-up shot (head and shoulders).`;
 
-    const shotTypes = [
-      { prompt: 'CRITICAL: The photograph MUST be a full-body shot, showing the model from head to toe.', label: '全身' },
-      { prompt: 'CRITICAL: The photograph MUST be a medium shot, capturing the model from the waist up.', label: '半身' },
-      { prompt: 'CRITICAL: The photograph MUST be a close-up shot, focusing on the model\'s head and shoulders.', label: '特寫' },
+    const shotTypes: { prompt: string; key: ShotLabelKey }[] = [
+      { prompt: 'CRITICAL: The photograph MUST be a full-body shot, showing the model from head to toe.', key: 'fullBody' },
+      { prompt: 'CRITICAL: The photograph MUST be a medium shot, capturing the model from the waist up.', key: 'medium' },
+      { prompt: 'CRITICAL: The photograph MUST be a close-up shot, focusing on the model\'s head and shoulders.', key: 'closeUp' },
     ];
     
     try {
@@ -274,10 +260,11 @@ The final output will be a set of three distinct, full-frame images from this sc
               const base64 = result.split(",")[1];
               resolve(base64 ?? "");
             } else {
-              reject(new Error("無法讀取圖片資料。"));
+              reject(new Error(t.errors.imageReadFailed));
             }
           };
-          reader.onerror = () => reject(reader.error ?? new Error("讀取圖片資料時發生錯誤。"));
+          reader.onerror = () =>
+            reject(reader.error ?? new Error(t.errors.imageReadFailed));
           reader.readAsDataURL(blob);
         });
 
@@ -348,12 +335,8 @@ The final output will be a set of three distinct, full-frame images from this sc
           const blockReason =
             response.promptFeedback?.blockReason ??
             response.promptFeedback?.safetyRatings?.[0]?.category;
-          console.error("Gemini 回傳內容缺少圖片資料", response);
-          throw new Error(
-            blockReason
-              ? `模型拒絕生成圖片：${blockReason}。`
-              : "API 未回傳任何圖片資料，請稍後再試。"
-          );
+          console.error("Gemini response returned no image content", response);
+          throw new Error(blockReason ?? t.errors.apiNoImage);
         }
 
         const imagePart = contentParts.find(
@@ -361,13 +344,14 @@ The final output will be a set of three distinct, full-frame images from this sc
         );
 
         if (!imagePart) {
-          console.error("Gemini 回傳內容缺少 image part", response);
-          throw new Error("API 未能針對其中一個視角回傳圖片。");
+          console.error("Gemini response did not include an image part", response);
+          throw new Error(t.errors.unknownShotFailure);
         }
 
         if (imagePart.inlineData?.data) {
           return {
-            label: shot.label,
+            label: translateShotLabel(shot.key),
+            labelKey: shot.key,
             mimeType: imagePart.inlineData.mimeType ?? "image/png",
             base64: imagePart.inlineData.data,
           };
@@ -377,8 +361,8 @@ The final output will be a set of three distinct, full-frame images from this sc
           const downloadUrl = appendApiKey(imagePart.fileData.fileUri);
           const imageResponse = await fetch(downloadUrl);
           if (!imageResponse.ok) {
-            console.error("下載 Gemini 圖片失敗", imageResponse);
-            throw new Error(`無法下載生成圖片（HTTP ${imageResponse.status}）。`);
+            console.error("Failed to download generated image", imageResponse);
+            throw new Error(t.errors.imageDownloadFailed(imageResponse.status));
           }
           const blob = await imageResponse.blob();
           const base64 = await blobToBase64(blob);
@@ -387,7 +371,8 @@ The final output will be a set of three distinct, full-frame images from this sc
             (blob.type ? blob.type : undefined) ??
             "image/png";
           return {
-            label: shot.label,
+            label: translateShotLabel(shot.key),
+            labelKey: shot.key,
             mimeType: resolvedMimeType,
             base64,
           };
@@ -397,28 +382,30 @@ The final output will be a set of three distinct, full-frame images from this sc
           const nestedInline = imagePart.parts.find((part: any) => part.inlineData);
           if (nestedInline?.inlineData?.data) {
             return {
-              label: shot.label,
+              label: translateShotLabel(shot.key),
+              labelKey: shot.key,
               mimeType: nestedInline.inlineData.mimeType ?? "image/png",
               base64: nestedInline.inlineData.data,
             };
           }
         }
 
-        console.error("Gemini 回傳內容未識別的圖片結構", response);
-        throw new Error("無法解析模型回傳的圖片資料。");
+        console.error("Gemini response produced an unrecognised image structure", response);
+        throw new Error(t.errors.general);
       });
 
       const generatedImagesRaw = await Promise.all(imagePromises);
-      const generatedImages = generatedImagesRaw.map(({ label, mimeType, base64 }) => ({
+      const generatedImages = generatedImagesRaw.map(({ label, labelKey, mimeType, base64 }) => ({
         src: `data:${mimeType};base64,${base64}`,
         label,
+        labelKey,
         videoSrc: null,
         isGeneratingVideo: false,
         videoError: null,
       }));
       
       if (generatedImages.length !== 3) {
-        throw new Error('圖片生成數量不足，請重試。');
+        throw new Error(t.errors.insufficientImages);
       }
 
       const imageResults: ImageResult[] = generatedImages.map(img => ({
@@ -433,7 +420,7 @@ The final output will be a set of three distinct, full-frame images from this sc
       try {
         storedImages = await uploadHistoryImages(user.uid, imageResults);
       } catch (uploadError) {
-        console.error("上傳歷史圖片失敗：", uploadError);
+        console.error("Failed to upload history images:", uploadError);
       }
       setImages(storedImages);
 
@@ -450,138 +437,150 @@ The final output will be a set of three distinct, full-frame images from this sc
       try {
         await addHistoryRecord(user.uid, historySnapshot);
       } catch (historyError) {
-        console.error('儲存歷史紀錄失敗：', historyError);
+        console.error("Failed to persist history record:", historyError);
       }
 
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : '發生未知錯誤，請稍後再試。');
+      const fallbackError =
+        err instanceof Error && err.message ? err.message : t.errors.general;
+      setError(fallbackError);
     } finally {
       setIsLoading(false);
     }
-  }, [formData, user, uploadHistoryImages, sanitizeFormDataForHistory, remainingCredits, isLoading]);
+  }, [formData, user, uploadHistoryImages, sanitizeFormDataForHistory, remainingCredits, isLoading, t, translateShotLabel]);
 
   const handleGenerateVideo = useCallback(async (index: number) => {
-    const supportedVideoRatios = ['16:9', '9:16'];
+    const supportedVideoRatios = ["16:9", "9:16"];
     const selectedAspectRatio = formData.aspectRatio;
     if (!supportedVideoRatios.includes(selectedAspectRatio)) {
-      setImages(prev => prev.map((img, i) =>
-        i === index
-          ? { ...img, isGeneratingVideo: false, videoError: '此長寬比不支援動態影像，請調整為 16:9 或 9:16 後再試。' }
-          : img
-      ));
+      setImages((prev) =>
+        prev.map((img, i) =>
+          i === index
+            ? { ...img, isGeneratingVideo: false, videoError: t.video.unsupportedAspect }
+            : img
+        )
+      );
       return;
     }
 
-    setImages(prev => prev.map((img, i) =>
+    setImages((prev) =>
+      prev.map((img, i) =>
         i === index ? { ...img, isGeneratingVideo: true, videoError: null } : img
-    ));
+      )
+    );
 
     try {
-        if (!GEMINI_API_KEY) {
-            throw new Error('尚未設定 Gemini API Key，請於環境變數新增 VITE_API_KEY。');
+      if (!GEMINI_API_KEY) {
+        throw new Error(t.errors.missingApiKey);
+      }
+      if (!window.aistudio || !(await window.aistudio.hasSelectedApiKey())) {
+        await window.aistudio?.openSelectKey();
+      }
+
+      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+      const targetImage = images[index];
+
+      const resolveImageBytes = async (src: string) => {
+        if (src.startsWith("data:")) {
+          const match = src.match(/^data:(.*);base64,(.*)$/);
+          if (!match) throw new Error(t.errors.imageReadFailed);
+          return {
+            imageBytes: match[2],
+            mimeType: match[1] || "image/jpeg",
+          };
         }
-        if (!window.aistudio || !(await window.aistudio.hasSelectedApiKey())) {
-            await window.aistudio?.openSelectKey();
+        const response = await fetch(src);
+        if (!response.ok) {
+          throw new Error(t.video.fetchImageFailed);
         }
-
-        const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-        const targetImage = images[index];
-
-        const resolveImageBytes = async (src: string) => {
-            if (src.startsWith('data:')) {
-                const match = src.match(/^data:(.*);base64,(.*)$/);
-                if (!match) throw new Error('無法解析圖片資料。');
-                return {
-                    imageBytes: match[2],
-                    mimeType: match[1] || 'image/jpeg',
-                };
+        const blob = await response.blob();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            if (typeof reader.result === "string") {
+              resolve(reader.result);
+            } else {
+              reject(new Error(t.errors.imageReadFailed));
             }
-            const response = await fetch(src);
-            if (!response.ok) {
-                throw new Error('下載圖片失敗，無法生成動畫。');
-            }
-            const blob = await response.blob();
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    if (typeof reader.result === 'string') {
-                        resolve(reader.result);
-                    } else {
-                        reject(new Error('無法讀取圖片資料。'));
-                    }
-                };
-                reader.onerror = () => reject(reader.error ?? new Error('無法讀取圖片資料。'));
-                reader.readAsDataURL(blob);
-            });
-            const match = dataUrl.match(/^data:(.*);base64,(.*)$/);
-            if (!match) {
-                throw new Error('無法解析圖片資料。');
-            }
-            return {
-                imageBytes: match[2],
-                mimeType: match[1] || blob.type || 'image/jpeg',
-            };
-        };
-
-        const { imageBytes, mimeType } = await resolveImageBytes(targetImage.src);
-        
-        const videoPrompt = "Make this a subtle, high-quality cinemagraph. The model's hair and clothing should move slightly in a gentle breeze.";
-
-        let operation = await ai.models.generateVideos({
-            model: 'veo-3.1-fast-generate-preview',
-            prompt: videoPrompt,
-            image: {
-                imageBytes,
-                mimeType,
-            },
-            config: {
-                numberOfVideos: 1,
-                resolution: '720p',
-                aspectRatio: formData.aspectRatio,
-            }
+          };
+          reader.onerror = () => reject(reader.error ?? new Error(t.errors.imageReadFailed));
+          reader.readAsDataURL(blob);
         });
-
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            operation = await ai.operations.getVideosOperation({ operation: operation });
+        const match = dataUrl.match(/^data:(.*);base64,(.*)$/);
+        if (!match) {
+          throw new Error(t.errors.imageReadFailed);
         }
-        
-        if (operation.error) {
-            throw new Error(operation.error.message || '影片生成過程中發生錯誤。');
-        }
+        return {
+          imageBytes: match[2],
+          mimeType: match[1] || blob.type || "image/jpeg",
+        };
+      };
 
-        const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (!downloadLink) {
-            throw new Error('無法取得影片下載連結。');
-        }
+      const { imageBytes, mimeType } = await resolveImageBytes(targetImage.src);
 
-        const separator = downloadLink.includes('?') ? '&' : '?';
-        const signedUrl = `${downloadLink}${separator}alt=media&key=${GEMINI_API_KEY}`;
-        const videoResponse = await fetch(signedUrl);
-        if (!videoResponse.ok) {
-            throw new Error(`下載影片失敗: ${videoResponse.statusText}`);
-        }
+      const videoPrompt =
+        "Make this a subtle, high-quality cinemagraph. The model's hair and clothing should move slightly in a gentle breeze.";
 
-        const videoBlob = await videoResponse.blob();
-        const videoUrl = URL.createObjectURL(videoBlob);
-        
-        setImages(prev => prev.map((img, i) => 
-            i === index ? { ...img, isGeneratingVideo: false, videoSrc: videoUrl } : img
-        ));
+      let operation = await ai.models.generateVideos({
+        model: "veo-3.1-fast-generate-preview",
+        prompt: videoPrompt,
+        image: {
+          imageBytes,
+          mimeType,
+        },
+        config: {
+          numberOfVideos: 1,
+          resolution: "720p",
+          aspectRatio: formData.aspectRatio,
+        },
+      });
+
+      while (!operation.done) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        operation = await ai.operations.getVideosOperation({ operation });
+      }
+
+      if (operation.error) {
+        throw new Error(operation.error.message || t.video.generateFailed);
+      }
+
+      const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+      if (!downloadLink) {
+        throw new Error(t.video.missingDownloadLink);
+      }
+
+      const separator = downloadLink.includes("?") ? "&" : "?";
+      const signedUrl = `${downloadLink}${separator}alt=media&key=${GEMINI_API_KEY}`;
+      const videoResponse = await fetch(signedUrl);
+      if (!videoResponse.ok) {
+        throw new Error(t.errors.videoDownloadFailed(videoResponse.statusText));
+      }
+
+      const videoBlob = await videoResponse.blob();
+      const videoUrl = URL.createObjectURL(videoBlob);
+
+      setImages((prev) =>
+        prev.map((img, i) =>
+          i === index ? { ...img, isGeneratingVideo: false, videoSrc: videoUrl } : img
+        )
+      );
 
     } catch (err: any) {
-        let errorMessage = err instanceof Error ? err.message : '發生未知錯誤，請稍後再試。';
-        if (errorMessage.includes("Requested entity was not found")) {
-            errorMessage = "API 金鑰驗證失敗，請重新選擇您的 API 金鑰後再試一次。";
-        }
-        
-        console.error("Video generation error:", err);
-        setImages(prev => prev.map((img, i) => 
-            i === index ? { ...img, isGeneratingVideo: false, videoError: errorMessage } : img
-        ));
+      let errorMessage =
+        err instanceof Error && err.message ? err.message : t.errors.general;
+      if (errorMessage.includes("Requested entity was not found")) {
+        errorMessage = t.errors.missingApiKey;
+      }
+
+      console.error("Video generation error:", err);
+      setImages((prev) =>
+        prev.map((img, i) =>
+          i === index ? { ...img, isGeneratingVideo: false, videoError: errorMessage } : img
+        )
+      );
     }
-}, [images, formData.aspectRatio]);
+}, [images, formData.aspectRatio, t]);
 
   const handleRestoreHistory = useCallback((item: HistoryItem) => {
     const restored = restoreFormDataFromHistory(item.formData);
@@ -603,7 +602,7 @@ The final output will be a set of three distinct, full-frame images from this sc
         const records = await fetchUserHistory(user.uid);
         setHistory(records);
       } catch (err) {
-        console.error('載入歷史紀錄失敗：', err);
+        console.error("Failed to load history records:", err);
       } finally {
         setIsHistoryLoading(false);
       }
@@ -623,7 +622,7 @@ The final output will be a set of three distinct, full-frame images from this sc
         const usage = await fetchGenerationQuota(user.uid);
         setRemainingCredits(usage.generationCredits);
       } catch (quotaError) {
-        console.error('載入生成額度失敗：', quotaError);
+        console.error("Failed to load remaining credits:", quotaError);
       } finally {
         setIsQuotaLoading(false);
       }
@@ -634,7 +633,7 @@ The final output will be a set of three distinct, full-frame images from this sc
   if (initializing) {
     return (
       <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center">
-        <p className="text-slate-400 text-lg">初始化中...</p>
+        <p className="text-slate-400 text-lg">{t.general.initializing}</p>
       </div>
     );
   }
@@ -678,5 +677,11 @@ The final output will be a set of three distinct, full-frame images from this sc
     </div>
   );
 };
+
+const App: React.FC = () => (
+  <TranslationProvider>
+    <AppContent />
+  </TranslationProvider>
+);
 
 export default App;
