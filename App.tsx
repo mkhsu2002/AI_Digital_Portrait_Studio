@@ -523,49 +523,27 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
 
   const handleShare = useCallback(async (platform: 'facebook' | 'instagram') => {
     if (!user) {
-      setError('請先登入後再分享。');
+      window.alert('請先登入後再分享。');
       return;
     }
 
     const primaryImage = images[0];
     if (!primaryImage) {
-      setError('目前沒有可分享的圖片，請先產生圖片。');
+      window.alert('目前沒有可分享的圖片，請先產生圖片。');
       return;
     }
 
     const message = "生成 by FlyPig AI 人像攝影棚 https://studio.icareu.tw/ #FlyPigAI";
 
-    const getBlobFromSrc = async (src: string) => {
-      if (src.startsWith('data:')) {
-        const response = await fetch(src);
-        return response.blob();
-      }
-      const response = await fetch(src);
-      return response.blob();
-    };
-
-    const tryWebShare = async (): Promise<'shared' | 'cancelled' | 'unsupported'> => {
+    const copyMessage = async () => {
       try {
-        const blob = await getBlobFromSrc(primaryImage.src);
-        const file = new File([blob], `flypig-ai-${Date.now()}.png`, { type: blob.type || 'image/png' });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], text: message });
-          return 'shared';
-        }
-        if (navigator.share) {
-          await navigator.share({ text: message });
-          return 'shared';
-        }
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          return 'cancelled';
-        }
-        console.error('Web Share 失敗：', err);
+        await navigator.clipboard.writeText(message);
+      } catch (clipboardError) {
+        console.error('複製分享文字失敗：', clipboardError);
       }
-      return 'unsupported';
     };
 
-    const completeShareReward = async () => {
+    const rewardShare = async () => {
       try {
         const credits = await rewardCreditForShare(user.uid);
         setRemainingCredits(credits);
@@ -574,45 +552,28 @@ Image composition: The image must have a ${formData.aspectRatio} aspect ratio.`;
       }
     };
 
-    if (platform === 'instagram') {
-      const shareResult = await tryWebShare();
-      if (shareResult === 'shared') {
-        await completeShareReward();
-        return;
-      }
-      if (shareResult === 'cancelled') {
-        return;
-      }
-      if (shareResult === 'unsupported') {
-        window.alert('Instagram 分享需要支援 Web Share 的裝置或瀏覽器。分享文字已複製，請自行貼上。');
-        try {
-          await navigator.clipboard.writeText(message);
-        } catch (clipboardError) {
-          console.error('複製分享文字失敗：', clipboardError);
-        }
-        window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
-      }
-      await completeShareReward();
+    await copyMessage();
+
+    if (primaryImage.src.startsWith('data:')) {
+      window.alert('此圖片尚未同步到雲端，請從歷史紀錄下載後再分享。分享文字已複製，可直接貼上使用。');
       return;
     }
 
-    // Facebook
-    const fbShareResult = await tryWebShare();
-    if (fbShareResult === 'shared') {
-      await completeShareReward();
-      return;
-    }
-    if (fbShareResult === 'cancelled') {
-      return;
-    }
-    if (fbShareResult === 'unsupported') {
+    if (platform === 'facebook') {
       const url = new URL('https://www.facebook.com/sharer/sharer.php');
       url.searchParams.set('u', primaryImage.src);
       url.searchParams.set('quote', message);
       window.open(url.toString(), '_blank', 'noopener,noreferrer');
+      await rewardShare();
+      return;
     }
-    await completeShareReward();
+
+    window.open(primaryImage.src, '_blank', 'noopener,noreferrer');
+    window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
+    window.alert('已開啟 Instagram 與圖片視窗，分享文字已複製，請於 Instagram 上傳圖片並貼上內容。');
+    await rewardShare();
   }, [user, images]);
+
 
   useEffect(() => {
     const loadHistory = async () => {
