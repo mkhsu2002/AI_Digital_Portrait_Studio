@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
+import type { AuthError } from "firebase/auth";
 import {
   User,
   onAuthStateChanged,
@@ -19,6 +20,29 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const sanitizeEmail = (email: string) => email.trim().toLowerCase();
+
+const mapAuthError = (error: AuthError): Error => {
+  const code = error.code;
+  switch (code) {
+    case 'auth/invalid-email':
+      return new Error('電子郵件格式不正確，請重新輸入。');
+    case 'auth/user-disabled':
+      return new Error('此帳號已被停用，請聯絡管理員。');
+    case 'auth/user-not-found':
+      return new Error('找不到相符的帳號，請確認是否已註冊。');
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return new Error('帳號或密碼錯誤，請重新確認。');
+    case 'auth/email-already-in-use':
+      return new Error('此電子郵件已被註冊，請直接登入或使用其他信箱。');
+    case 'auth/weak-password':
+      return new Error('密碼強度不足，請至少輸入六個字元。');
+    default:
+      return new Error(error.message || '操作失敗，請稍後再試。');
+  }
+};
+
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -33,11 +57,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    try {
+      await signInWithEmailAndPassword(auth, sanitizeEmail(email), password);
+    } catch (err) {
+      throw mapAuthError(err as AuthError);
+    }
   };
 
   const register = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password);
+    try {
+      await createUserWithEmailAndPassword(auth, sanitizeEmail(email), password);
+    } catch (err) {
+      throw mapAuthError(err as AuthError);
+    }
   };
 
   const logout = async () => {
@@ -45,7 +77,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (email: string) => {
-    await sendPasswordResetEmail(auth, email);
+    try {
+      await sendPasswordResetEmail(auth, sanitizeEmail(email));
+    } catch (err) {
+      throw mapAuthError(err as AuthError);
+    }
   };
 
   const value = useMemo(
