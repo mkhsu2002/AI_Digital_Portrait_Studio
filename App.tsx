@@ -556,7 +556,8 @@ The final output will be a set of three distinct, full-frame images from this sc
             throw new Error('無法取得影片下載連結。');
         }
 
-        const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY!}`);
+        const signedUrl = downloadLink.includes('?') ? downloadLink : `${downloadLink}?key=${GEMINI_API_KEY}`;
+        const videoResponse = await fetch(signedUrl);
         if (!videoResponse.ok) {
             throw new Error(`下載影片失敗: ${videoResponse.statusText}`);
         }
