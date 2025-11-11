@@ -55,6 +55,8 @@
 - **Vercel**：對 Vite 專案支援度高，只需在專案設定中填入上述環境變數即可完成部署。
 - **Google Cloud（Cloud Run / Firebase Hosting）**：適合與 Firebase 服務同屬專案管理，部署前請先執行 `npm run build`，再將 `dist` 或 SSR 結果上傳。
 
+> 預設的 `main` 分支為每個帳號提供 3 次免費生成額度；若需要無限制使用，請改用 `unlimited_v3.0` 分支部署。
+
 若需協助委外部署或客製化選項開發（例如新增場景、人物姿態)，歡迎聯絡 FlyPig AI
 Email: flypig@icareu.tw  / LIND ID: icareuec
 

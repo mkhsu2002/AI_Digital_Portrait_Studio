@@ -55,6 +55,8 @@ AI Digital Portrait Studio is a React + Vite web application that blends Google 
 - **Vercel** – First-class support for Vite deployments with simple environment variable management.
 - **Google Cloud (Cloud Run / Firebase Hosting)** – Ideal if you want tighter integration with existing Firebase resources. Build locally with `npm run build`, then deploy the generated `dist` output (or SSR target).
 
+> The default `main` branch limits each account to 3 free generations. If you need unlimited usage, deploy from the `unlimited_v3.0` branch.
+
 For managed deployment or custom feature requests (e.g., additional scenes or poses), contact FlyPig AI: `flypig@icareu.tw` / LINE ID `icareuec`.
 
 ## License
