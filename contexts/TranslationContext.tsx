@@ -358,7 +358,9 @@ const translations: Record<Language, Translations> = {
       credits: (remaining, isLoading) =>
         isLoading
           ? "讀取中..."
-          : `剩餘生成次數：${remaining ?? 0}（每位新註冊使用者僅享 3 次）`,
+          : Number.isFinite(remaining)
+          ? `剩餘生成次數：${remaining ?? 0}（每位新註冊使用者僅享 3 次）`
+          : "剩餘生成次數：無限制",
       "logout": "登出",
       "languageToggleLabel": "English",
     },
