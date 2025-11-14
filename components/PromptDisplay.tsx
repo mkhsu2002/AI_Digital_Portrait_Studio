@@ -32,16 +32,31 @@ const PromptDisplay: React.FC<PromptDisplayProps> = ({
 
   const handleDownload = useCallback(async (fileUrl: string, filename: string) => {
     try {
-      const response = await fetch(fileUrl);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      // 如果是 data: URL，直接轉換為 blob 並下載
+      if (fileUrl.startsWith("data:")) {
+        const response = await fetch(fileUrl);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      // 對於 Firebase Storage 或其他 HTTP/HTTPS URL，直接使用 <a> 標籤下載
+      // 這樣可以避免 CORS 問題，讓瀏覽器直接處理下載
       const link = document.createElement("a");
-      link.href = url;
+      link.href = fileUrl;
       link.download = filename;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Failed to download file:", err);
     }

@@ -490,31 +490,77 @@ The final output will be a set of three distinct, full-frame images from this sc
             mimeType: match[1] || "image/jpeg",
           };
         }
-        const response = await fetch(src);
-        if (!response.ok) {
-          throw new Error(t.video.fetchImageFailed);
-        }
-        const blob = await response.blob();
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (typeof reader.result === "string") {
-              resolve(reader.result);
-            } else {
-              reject(new Error(t.errors.imageReadFailed));
+
+        // 對於 Firebase Storage URL，使用 <img> 標籤加載圖片，然後轉換為 canvas
+        // 這樣可以避免 CORS 問題
+        return new Promise<{ imageBytes: string; mimeType: string }>((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          
+          img.onload = () => {
+            try {
+              const canvas = document.createElement("canvas");
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext("2d");
+              if (!ctx) {
+                reject(new Error(t.errors.imageReadFailed));
+                return;
+              }
+              ctx.drawImage(img, 0, 0);
+              
+              // 轉換為 base64
+              const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+              const match = dataUrl.match(/^data:(.*);base64,(.*)$/);
+              if (!match) {
+                reject(new Error(t.errors.imageReadFailed));
+                return;
+              }
+              resolve({
+                imageBytes: match[2],
+                mimeType: match[1] || "image/jpeg",
+              });
+            } catch (err) {
+              reject(err instanceof Error ? err : new Error(t.errors.imageReadFailed));
             }
           };
-          reader.onerror = () => reject(reader.error ?? new Error(t.errors.imageReadFailed));
-          reader.readAsDataURL(blob);
+
+          img.onerror = () => {
+            // 如果 crossOrigin 失敗，嘗試使用 fetch（可能會失敗，但至少嘗試）
+            fetch(src)
+              .then((response) => {
+                if (!response.ok) {
+                  throw new Error(t.video.fetchImageFailed);
+                }
+                return response.blob();
+              })
+              .then((blob) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  if (typeof reader.result === "string") {
+                    const match = reader.result.match(/^data:(.*);base64,(.*)$/);
+                    if (!match) {
+                      reject(new Error(t.errors.imageReadFailed));
+                      return;
+                    }
+                    resolve({
+                      imageBytes: match[2],
+                      mimeType: match[1] || blob.type || "image/jpeg",
+                    });
+                  } else {
+                    reject(new Error(t.errors.imageReadFailed));
+                  }
+                };
+                reader.onerror = () => reject(reader.error ?? new Error(t.errors.imageReadFailed));
+                reader.readAsDataURL(blob);
+              })
+              .catch((err) => {
+                reject(err instanceof Error ? err : new Error(t.video.fetchImageFailed));
+              });
+          };
+
+          img.src = src;
         });
-        const match = dataUrl.match(/^data:(.*);base64,(.*)$/);
-        if (!match) {
-          throw new Error(t.errors.imageReadFailed);
-        }
-        return {
-          imageBytes: match[2],
-          mimeType: match[1] || blob.type || "image/jpeg",
-        };
       };
 
       const { imageBytes, mimeType } = await resolveImageBytes(targetImage.src);
