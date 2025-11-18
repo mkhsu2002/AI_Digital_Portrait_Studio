@@ -7,7 +7,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-const DEFAULT_GENERATION_CREDITS = 3;
+const DEFAULT_GENERATION_CREDITS = 100;
 
 interface UsageDoc {
   generationCredits: number;

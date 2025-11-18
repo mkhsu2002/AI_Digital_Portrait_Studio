@@ -358,7 +358,7 @@ const translations: Record<Language, Translations> = {
       credits: (remaining, isLoading) =>
         isLoading
           ? "讀取中..."
-          : `剩餘生成次數：${remaining ?? 0}（每位新註冊使用者僅享 3 次）`,
+          : `剩餘生成次數：${remaining ?? 0}（每位新註冊使用者僅享 100 次）`,
       "logout": "登出",
       "languageToggleLabel": "English",
     },
@@ -473,7 +473,7 @@ const translations: Record<Language, Translations> = {
       credits: (remaining, isLoading) =>
         isLoading
           ? "Loading credits..."
-          : `Remaining credits: ${remaining ?? 0} (each new user receives 3 free generations)`,
+          : `Remaining credits: ${remaining ?? 0} (each new user receives 100 free generations)`,
       "logout": "Sign out",
       "languageToggleLabel": "中文",
     },
