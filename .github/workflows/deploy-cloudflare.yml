@@ -36,7 +36,8 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           # Cloudflare Pages 通常不需要 base path（預設為 '/'）
           # 只有在使用自訂域名且設定子路徑時才需要
-          VITE_BASE_PATH: ${{ secrets.VITE_BASE_PATH || '/' }}
+          # 重要：Cloudflare Pages 部署時，base path 應該設為 '/'
+          VITE_BASE_PATH: '/'
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
