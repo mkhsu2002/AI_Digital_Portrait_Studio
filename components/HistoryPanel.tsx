@@ -9,7 +9,7 @@ interface HistoryPanelProps {
   isLoading?: boolean;
 }
 
-const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, onRestore, isLoading = false }) => {
+const HistoryPanel: React.FC<HistoryPanelProps> = React.memo(({ history, onRestore, onDelete, isLoading = false }) => {
   const { t, translateOption } = useTranslation();
 
   return (
@@ -25,25 +25,49 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, onRestore, isLoadi
             const styleLabel = translateOption("clothingStyle", item.formData.clothingStyle);
             const backgroundLabel = translateOption("background", item.formData.background);
             return (
-              <li key={index}>
-                <button
-                  onClick={() => onRestore(item)}
-                  className="w-full flex items-center gap-4 p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 transition-colors text-left group"
-                  aria-label={t.history.restoreLabel(item.formData.productName)}
-                >
-                  <img
-                    src={item.images[0]?.src ?? ""}
-                    alt={item.formData.productName}
-                    className="w-16 h-16 rounded-md object-cover flex-shrink-0 border border-slate-600"
-                  />
-                  <div className="flex-grow overflow-hidden">
-                    <p className="font-semibold text-slate-200 truncate">{item.formData.productName}</p>
-                    <p className="text-sm text-slate-400 truncate">{`${styleLabel}, ${backgroundLabel}`}</p>
-                  </div>
-                  <div className="flex-shrink-0 text-slate-500 group-hover:text-blue-400 transition-colors">
-                    <HistoryIcon className="w-6 h-6" />
-                  </div>
-                </button>
+              <li key={item.id || index}>
+                <div className="flex items-center gap-2 group">
+                  <button
+                    onClick={() => onRestore(item)}
+                    className="flex-1 flex items-center gap-4 p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 transition-colors text-left"
+                    aria-label={t.history.restoreLabel(item.formData.productName)}
+                  >
+                    <img
+                      src={item.images[0]?.src ?? ""}
+                      alt={item.formData.productName}
+                      className="w-16 h-16 rounded-md object-cover flex-shrink-0 border border-slate-600"
+                    />
+                    <div className="flex-grow overflow-hidden">
+                      <p className="font-semibold text-slate-200 truncate">{item.formData.productName}</p>
+                      <p className="text-sm text-slate-400 truncate">{`${styleLabel}, ${backgroundLabel}`}</p>
+                    </div>
+                    <div className="flex-shrink-0 text-slate-500 group-hover:text-blue-400 transition-colors">
+                      <HistoryIcon className="w-6 h-6" />
+                    </div>
+                  </button>
+                  {onDelete && item.id && (
+                    <button
+                      onClick={() => onDelete(item.id!)}
+                      className="p-2 rounded-lg bg-slate-700/50 hover:bg-red-600/20 text-slate-400 hover:text-red-400 transition-colors flex-shrink-0"
+                      aria-label="刪除紀錄"
+                      title="刪除紀錄"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </li>
             );
           })}
@@ -51,6 +75,8 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, onRestore, isLoadi
       )}
     </div>
   );
-};
+});
+
+HistoryPanel.displayName = 'HistoryPanel';
 
 export default HistoryPanel;

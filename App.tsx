@@ -1,38 +1,36 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
-import type { FormDataState, ImageResult, HistoryItem, HistoryFormData, ShotLabelKey } from './types';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import type { FormDataState, ImageResult, HistoryItem, HistoryFormData } from './types';
 import { CLOTHING_STYLES, EXPRESSIONS, LIGHTING_CONDITIONS, ASPECT_RATIOS, BACKGROUNDS, CLOTHING_SEASONS, POSES, MODEL_GENDERS } from './constants';
 import Header from './components/Header';
-import PromptForm from './components/PromptForm';
-import PromptDisplay from './components/PromptDisplay';
-import HistoryPanel from './components/HistoryPanel';
 import AuthGate from './components/AuthGate';
+import ErrorBoundary from './components/ErrorBoundary';
+import SpinnerIcon from './components/icons/SpinnerIcon';
+
+// 程式碼分割：延遲載入主要組件
+const PromptForm = lazy(() => import('./components/PromptForm'));
+const PromptDisplay = lazy(() => import('./components/PromptDisplay'));
+const HistoryPanel = lazy(() => import('./components/HistoryPanel'));
+
+// Loading 組件
+const ComponentLoader: React.FC = () => (
+  <div className="flex items-center justify-center p-8">
+    <SpinnerIcon className="w-8 h-8 animate-spin text-blue-500" />
+  </div>
+);
 import { useAuth } from './contexts/AuthContext';
 import { TranslationProvider, useTranslation } from './contexts/TranslationContext';
-import { addHistoryRecord, fetchUserHistory } from './services/historyService';
-import { storage } from "./firebase";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { fetchGenerationQuota, consumeGenerationCredit } from './services/usageService';
-
-const GEMINI_API_KEY = import.meta.env.VITE_API_KEY ?? '';
-
-// Fix: Defined the AIStudio interface globally to resolve a TypeScript error
-// about subsequent property declarations having conflicting types. This ensures
-// the type definition for window.aistudio matches other declarations.
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
+import { ApiProvider, useApi } from './contexts/ApiContext';
+import { buildDisplayPrompt } from './utils/promptBuilder';
+import { validateFile, validateFormData } from './utils/validation';
+import { smartCompressImage } from './utils/imageCompression';
+import { logEnvValidation } from './utils/envValidation';
+import { useDebounce } from './hooks/useDebounce';
 
 const AppContent: React.FC = () => {
   const { user, initializing } = useAuth();
   const { t, translateOption, translateShotLabel } = useTranslation();
+  const api = useApi();
   const [formData, setFormData] = useState<FormDataState>({
     productName: '登山後背包',
     clothingStyle: CLOTHING_STYLES[8], // 戶外休閒風
@@ -57,46 +55,66 @@ const AppContent: React.FC = () => {
   const [remainingCredits, setRemainingCredits] = useState<number | null>(null);
   const [isQuotaLoading, setIsQuotaLoading] = useState<boolean>(true);
 
+  // 使用防抖動處理 prompt 生成，減少不必要的重新計算
+  const debouncedFormData = useDebounce(formData, 500);
 
   useEffect(() => {
     // 此詠唱僅用於顯示和複製。
     // 實際的生成邏輯會為每個鏡頭使用獨立的詠唱。
-    const prompt = `A professional fashion photoshoot featuring '${formData.productName}'.
-A ${formData.modelGender === '女性模特兒' ? 'female' : 'male'} model with a ${formData.clothingStyle} aesthetic is wearing clothing suitable for the ${formData.clothingSeason}.
-The setting is ${formData.background}.
-The model has a ${formData.expression} expression and is in a ${formData.pose} pose.${formData.additionalDescription ? `\nAdditional details: ${formData.additionalDescription}.` : ''}
-${formData.faceImage ? `\nCRITICAL: The model's face must be identical to the face in the provided reference image.` : ''}
-${formData.objectImage ? `\nCRITICAL: The scene must prominently feature the object from the provided reference image.` : ''}
-Photographic style: Lit with ${formData.lighting}. The image should be detailed, ultra-realistic, photorealistic, high resolution (8k), cinematic, with a shallow depth of field and beautiful bokeh.
-The final output will be a set of three distinct, full-frame images from this scene:
-1. A full-body shot.
-2. A medium shot (from the waist up).
-3. A close-up shot (head and shoulders).`;
+    const prompt = buildDisplayPrompt(debouncedFormData);
     setGeneratedPrompt(prompt);
-  }, [formData, user]);
+  }, [debouncedFormData]);
 
   const handleFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   }, []);
   
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, files } = e.target;
     if (files && files.length > 0) {
-        const file = files[0];
+      const file = files[0];
+      
+      // 驗證檔案
+      const validation = validateFile(file);
+      if (!validation.valid) {
+        setError(validation.error || '檔案驗證失敗');
+        // 清除檔案輸入
+        e.target.value = '';
+        return;
+      }
+
+      try {
+        // 壓縮圖片（如果需要）
+        const compressedBlob = await smartCompressImage(file, {
+          maxWidth: 1920,
+          maxHeight: 1920,
+          quality: 0.8,
+          minSize: 500 * 1024, // 500KB 以下不壓縮
+        });
+
+        // 將 Blob 轉換為 base64
         const reader = new FileReader();
         reader.onloadend = () => {
-            const base64String = (reader.result as string).split(',')[1];
-            setFormData(prev => ({
-                ...prev,
-                [name]: {
-                    data: base64String,
-                    mimeType: file.type,
-                    name: file.name,
-                },
-            }));
+          const base64String = (reader.result as string).split(',')[1];
+          setFormData(prev => ({
+            ...prev,
+            [name]: {
+              data: base64String,
+              mimeType: compressedBlob.type || file.type,
+              name: file.name,
+            },
+          }));
         };
-        reader.readAsDataURL(file);
+        reader.onerror = () => {
+          setError('無法讀取檔案');
+        };
+        reader.readAsDataURL(compressedBlob);
+      } catch (error) {
+        console.error('檔案處理錯誤:', error);
+        setError(error instanceof Error ? error.message : '檔案處理失敗');
+        e.target.value = '';
+      }
     }
   }, []);
 
@@ -159,36 +177,6 @@ The final output will be a set of three distinct, full-frame images from this sc
     []
   );
 
-  const uploadHistoryImages = useCallback(async (uid: string, images: ImageResult[]): Promise<ImageResult[]> => {
-    if (!storage) {
-      console.warn("Firebase Storage is not initialised; history items will keep base64 data.");
-      return images;
-    }
-
-    const timestamp = Date.now();
-    const uploadedImages = await Promise.all(
-      images.map(async (image, index) => {
-        if (!image.src.startsWith("data:")) {
-          return image;
-        }
-
-        const dataUrlMatch = image.src.match(/^data:(image\/[a-zA-Z0-9+.+-]+);base64,/);
-        const mimeTypeFromDataUrl = dataUrlMatch?.[1] ?? "image/png";
-        const extensionRaw = mimeTypeFromDataUrl.split("/")[1]?.toLowerCase() ?? "png";
-        const extension = extensionRaw === "jpeg" ? "jpg" : extensionRaw;
-        const storageRef = ref(storage, `users/${uid}/history/${timestamp}-${index}.${extension}`);
-
-        await uploadString(storageRef, image.src, "data_url");
-        const downloadUrl = await getDownloadURL(storageRef);
-
-        return {
-          ...image,
-          src: downloadUrl,
-        };
-      })
-    );
-    return uploadedImages;
-  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (isLoading) {
@@ -197,14 +185,24 @@ The final output will be a set of three distinct, full-frame images from this sc
 
     setError(null);
 
+    // 驗證表單資料
+    const formValidation = validateFormData(formData);
+    if (!formValidation.valid) {
+      const firstError = Object.values(formValidation.errors)[0];
+      setError(firstError || '表單驗證失敗');
+      return;
+    }
+
     if (!user) {
       setError(t.errors.mustLogin);
       return;
     }
-    if (!GEMINI_API_KEY) {
+    
+    if (!api.checkApiKeyAvailable()) {
       setError(t.errors.missingApiKey);
       return;
     }
+    
     if (remainingCredits !== null && remainingCredits <= 0) {
       setError(t.errors.quotaExhausted);
       return;
@@ -212,7 +210,7 @@ The final output will be a set of three distinct, full-frame images from this sc
 
     let creditsAfterConsume = remainingCredits ?? null;
     try {
-      creditsAfterConsume = await consumeGenerationCredit(user.uid);
+      creditsAfterConsume = await api.consumeCredit(user.uid);
       setRemainingCredits(creditsAfterConsume);
     } catch (consumeError) {
       if (consumeError instanceof Error && consumeError.message === "NO_CREDITS") {
@@ -227,198 +225,19 @@ The final output will be a set of three distinct, full-frame images from this sc
     setIsLoading(true);
     setImages([]);
     
-    const basePrompt = `A professional fashion photoshoot featuring '${formData.productName}'.
-A ${formData.modelGender === '女性模特兒' ? 'female' : 'male'} model with a ${formData.clothingStyle} aesthetic is wearing clothing suitable for the ${formData.clothingSeason}.
-The setting is ${formData.background}.
-The model has a ${formData.expression} expression and is in a ${formData.pose} pose.${formData.additionalDescription ? `\nAdditional details: ${formData.additionalDescription}.` : ''}
-Photographic style: Lit with ${formData.lighting}. This must be a single, full-frame photograph. The image should be detailed, ultra-realistic, photorealistic, high resolution (8k), cinematic, with a shallow depth of field and beautiful bokeh. Do not create collages, diptychs, triptychs, or any split-screen images.
-The final output will be a set of three distinct, full-frame images from this scene:
-1. A full-body shot.
-2. A medium shot (from the waist up).
-3. A close-up shot (head and shoulders).`;
-
-    const shotTypes: { prompt: string; key: ShotLabelKey }[] = [
-      { prompt: 'CRITICAL: The photograph MUST be a full-body shot, showing the model from head to toe.', key: 'fullBody' },
-      { prompt: 'CRITICAL: The photograph MUST be a medium shot, capturing the model from the waist up.', key: 'medium' },
-      { prompt: 'CRITICAL: The photograph MUST be a close-up shot, focusing on the model\'s head and shoulders.', key: 'closeUp' },
-    ];
-    
     try {
-      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-      
-      const appendApiKey = (url: string) => {
-        if (!GEMINI_API_KEY) return url;
-        return url.includes("?") ? `${url}&key=${GEMINI_API_KEY}` : `${url}?key=${GEMINI_API_KEY}`;
+      const shotLabels = {
+        fullBody: translateShotLabel('fullBody'),
+        medium: translateShotLabel('medium'),
+        closeUp: translateShotLabel('closeUp'),
       };
-
-      const blobToBase64 = (blob: Blob) =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const result = reader.result;
-            if (typeof result === "string") {
-              const base64 = result.split(",")[1];
-              resolve(base64 ?? "");
-            } else {
-              reject(new Error(t.errors.imageReadFailed));
-            }
-          };
-          reader.onerror = () =>
-            reject(reader.error ?? new Error(t.errors.imageReadFailed));
-          reader.readAsDataURL(blob);
-        });
-
-      const extractCandidates = (rawResponse: any) => {
-        if (rawResponse?.candidates) return rawResponse.candidates;
-        if (rawResponse?.response?.candidates) return rawResponse.response.candidates;
-        if (Array.isArray(rawResponse?.inlinedResponses)) {
-          const inlineMatch = rawResponse.inlinedResponses.find(
-            (item: any) => item?.response?.candidates?.length
-          );
-          if (inlineMatch) return inlineMatch.response.candidates;
-        }
-        if (Array.isArray(rawResponse?.response?.inlinedResponses)) {
-          const inlineMatch = rawResponse.response.inlinedResponses.find(
-            (item: any) => item?.response?.candidates?.length
-          );
-          if (inlineMatch) return inlineMatch.response.candidates;
-        }
-        return undefined;
-      };
-
-      const imagePromises = shotTypes.map(async (shot) => {
-        const parts: ({ text: string } | { inlineData: { data: string; mimeType: string } })[] = [];
-
-        let promptWithInstructions = `${basePrompt}\n${shot.prompt}`;
-
-        if (formData.faceImage) {
-          promptWithInstructions += "\nCRITICAL INSTRUCTION: The model's face must be identical to the face in the first provided image.";
-          parts.push({
-            inlineData: {
-              data: formData.faceImage.data,
-              mimeType: formData.faceImage.mimeType,
-            },
-          });
-        }
-        if (formData.objectImage) {
-          const imageRefText = formData.faceImage ? "second" : "first";
-          promptWithInstructions += `\nCRITICAL INSTRUCTION: The scene must prominently feature the object from the ${imageRefText} provided image.`;
-          parts.push({
-            inlineData: {
-              data: formData.objectImage.data,
-              mimeType: formData.objectImage.mimeType,
-            },
-          });
-        }
-
-        parts.push({ text: promptWithInstructions });
-
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash-image",
-          contents: [{
-            role: 'user',
-            parts,
-          }],
-          config: {
-            responseModalities: [Modality.IMAGE],
-            imageConfig: {
-              aspectRatio: formData.aspectRatio,
-            },
-          },
-        });
-
-        const candidates = extractCandidates(response);
-        const candidate = candidates?.[0] ?? null;
-        const contentParts: any[] | undefined = candidate?.content?.parts;
-
-        if (!contentParts || contentParts.length === 0) {
-          const blockReason =
-            response.promptFeedback?.blockReason ??
-            response.promptFeedback?.safetyRatings?.[0]?.category;
-          console.error("Gemini response returned no image content", response);
-          throw new Error(blockReason ?? t.errors.apiNoImage);
-        }
-
-        const imagePart = contentParts.find(
-          (part) => part.inlineData || part.fileData || (Array.isArray(part.parts) && part.parts.length > 0)
-        );
-
-        if (!imagePart) {
-          console.error("Gemini response did not include an image part", response);
-          throw new Error(t.errors.unknownShotFailure);
-        }
-
-        if (imagePart.inlineData?.data) {
-          return {
-            label: translateShotLabel(shot.key),
-            labelKey: shot.key,
-            mimeType: imagePart.inlineData.mimeType ?? "image/png",
-            base64: imagePart.inlineData.data,
-          };
-        }
-
-        if (imagePart.fileData?.fileUri) {
-          const downloadUrl = appendApiKey(imagePart.fileData.fileUri);
-          const imageResponse = await fetch(downloadUrl);
-          if (!imageResponse.ok) {
-            console.error("Failed to download generated image", imageResponse);
-            throw new Error(t.errors.imageDownloadFailed(imageResponse.status));
-          }
-          const blob = await imageResponse.blob();
-          const base64 = await blobToBase64(blob);
-          const resolvedMimeType =
-            imagePart.fileData.mimeType ??
-            (blob.type ? blob.type : undefined) ??
-            "image/png";
-          return {
-            label: translateShotLabel(shot.key),
-            labelKey: shot.key,
-            mimeType: resolvedMimeType,
-            base64,
-          };
-        }
-
-        if (Array.isArray(imagePart.parts)) {
-          const nestedInline = imagePart.parts.find((part: any) => part.inlineData);
-          if (nestedInline?.inlineData?.data) {
-            return {
-              label: translateShotLabel(shot.key),
-              labelKey: shot.key,
-              mimeType: nestedInline.inlineData.mimeType ?? "image/png",
-              base64: nestedInline.inlineData.data,
-            };
-          }
-        }
-
-        console.error("Gemini response produced an unrecognised image structure", response);
-        throw new Error(t.errors.general);
-      });
-
-      const generatedImagesRaw = await Promise.all(imagePromises);
-      const generatedImages = generatedImagesRaw.map(({ label, labelKey, mimeType, base64 }) => ({
-        src: `data:${mimeType};base64,${base64}`,
-        label,
-        labelKey,
-        videoSrc: null,
-        isGeneratingVideo: false,
-        videoError: null,
-      }));
       
-      if (generatedImages.length !== 3) {
-        throw new Error(t.errors.insufficientImages);
-      }
+      const generatedImages = await api.generateImages(formData, shotLabels);
+      setImages(generatedImages);
 
-      const imageResults: ImageResult[] = generatedImages.map(img => ({
-        ...img,
-        videoSrc: null,
-        isGeneratingVideo: false,
-        videoError: null,
-      }));
-      setImages(imageResults);
-
-      let storedImages: ImageResult[] = imageResults;
+      let storedImages: ImageResult[] = generatedImages;
       try {
-        storedImages = await uploadHistoryImages(user.uid, imageResults);
+        storedImages = await api.uploadHistoryImages(user.uid, generatedImages);
       } catch (uploadError) {
         console.error("Failed to upload history images:", uploadError);
       }
@@ -435,7 +254,7 @@ The final output will be a set of three distinct, full-frame images from this sc
       });
 
       try {
-        await addHistoryRecord(user.uid, historySnapshot);
+        await api.saveHistoryRecord(user.uid, historySnapshot);
       } catch (historyError) {
         console.error("Failed to persist history record:", historyError);
       }
@@ -448,7 +267,7 @@ The final output will be a set of three distinct, full-frame images from this sc
     } finally {
       setIsLoading(false);
     }
-  }, [formData, user, uploadHistoryImages, sanitizeFormDataForHistory, remainingCredits, isLoading, t, translateShotLabel]);
+  }, [formData, user, remainingCredits, isLoading, t, translateShotLabel, api]);
 
   const handleGenerateVideo = useCallback(async (index: number) => {
     const supportedVideoRatios = ["16:9", "9:16"];
@@ -471,94 +290,8 @@ The final output will be a set of three distinct, full-frame images from this sc
     );
 
     try {
-      if (!GEMINI_API_KEY) {
-        throw new Error(t.errors.missingApiKey);
-      }
-      if (!window.aistudio || !(await window.aistudio.hasSelectedApiKey())) {
-        await window.aistudio?.openSelectKey();
-      }
-
-      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
       const targetImage = images[index];
-
-      const resolveImageBytes = async (src: string) => {
-        if (src.startsWith("data:")) {
-          const match = src.match(/^data:(.*);base64,(.*)$/);
-          if (!match) throw new Error(t.errors.imageReadFailed);
-          return {
-            imageBytes: match[2],
-            mimeType: match[1] || "image/jpeg",
-          };
-        }
-        const response = await fetch(src);
-        if (!response.ok) {
-          throw new Error(t.video.fetchImageFailed);
-        }
-        const blob = await response.blob();
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (typeof reader.result === "string") {
-              resolve(reader.result);
-            } else {
-              reject(new Error(t.errors.imageReadFailed));
-            }
-          };
-          reader.onerror = () => reject(reader.error ?? new Error(t.errors.imageReadFailed));
-          reader.readAsDataURL(blob);
-        });
-        const match = dataUrl.match(/^data:(.*);base64,(.*)$/);
-        if (!match) {
-          throw new Error(t.errors.imageReadFailed);
-        }
-        return {
-          imageBytes: match[2],
-          mimeType: match[1] || blob.type || "image/jpeg",
-        };
-      };
-
-      const { imageBytes, mimeType } = await resolveImageBytes(targetImage.src);
-
-      const videoPrompt =
-        "Make this a subtle, high-quality cinemagraph. The model's hair and clothing should move slightly in a gentle breeze.";
-
-      let operation = await ai.models.generateVideos({
-        model: "veo-3.1-fast-generate-preview",
-        prompt: videoPrompt,
-        image: {
-          imageBytes,
-          mimeType,
-        },
-        config: {
-          numberOfVideos: 1,
-          resolution: "720p",
-          aspectRatio: formData.aspectRatio,
-        },
-      });
-
-      while (!operation.done) {
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-        operation = await ai.operations.getVideosOperation({ operation });
-      }
-
-      if (operation.error) {
-        throw new Error(operation.error.message || t.video.generateFailed);
-      }
-
-      const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      if (!downloadLink) {
-        throw new Error(t.video.missingDownloadLink);
-      }
-
-      const separator = downloadLink.includes("?") ? "&" : "?";
-      const signedUrl = `${downloadLink}${separator}alt=media&key=${GEMINI_API_KEY}`;
-      const videoResponse = await fetch(signedUrl);
-      if (!videoResponse.ok) {
-        throw new Error(t.errors.videoDownloadFailed(videoResponse.statusText));
-      }
-
-      const videoBlob = await videoResponse.blob();
-      const videoUrl = URL.createObjectURL(videoBlob);
+      const videoUrl = await api.generateVideo(targetImage.src, formData.aspectRatio);
 
       setImages((prev) =>
         prev.map((img, i) =>
@@ -580,7 +313,7 @@ The final output will be a set of three distinct, full-frame images from this sc
         )
       );
     }
-}, [images, formData.aspectRatio, t]);
+  }, [images, formData.aspectRatio, t, api]);
 
   const handleRestoreHistory = useCallback((item: HistoryItem) => {
     const restored = restoreFormDataFromHistory(item.formData);
@@ -589,6 +322,18 @@ The final output will be a set of three distinct, full-frame images from this sc
     setError(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [restoreFormDataFromHistory]);
+
+  const handleDeleteHistory = useCallback(async (recordId: string) => {
+    if (!user) return;
+    
+    try {
+      await api.deleteHistoryRecord(user.uid, recordId);
+      setHistory(prevHistory => prevHistory.filter(item => item.id !== recordId));
+    } catch (error) {
+      console.error("Failed to delete history record:", error);
+      setError(t.errors.general);
+    }
+  }, [user, api, t]);
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -599,7 +344,7 @@ The final output will be a set of three distinct, full-frame images from this sc
       }
       setIsHistoryLoading(true);
       try {
-        const records = await fetchUserHistory(user.uid);
+        const records = await api.loadUserHistory(user.uid);
         setHistory(records);
       } catch (err) {
         console.error("Failed to load history records:", err);
@@ -608,7 +353,7 @@ The final output will be a set of three distinct, full-frame images from this sc
       }
     };
     loadHistory();
-  }, [user]);
+  }, [user, api]);
 
   useEffect(() => {
     const loadQuota = async () => {
@@ -619,7 +364,7 @@ The final output will be a set of three distinct, full-frame images from this sc
       }
       setIsQuotaLoading(true);
       try {
-        const usage = await fetchGenerationQuota(user.uid);
+        const usage = await api.loadGenerationQuota(user.uid);
         setRemainingCredits(usage.generationCredits);
       } catch (quotaError) {
         console.error("Failed to load remaining credits:", quotaError);
@@ -628,7 +373,7 @@ The final output will be a set of three distinct, full-frame images from this sc
       }
     };
     loadQuota();
-  }, [user]);
+  }, [user, api]);
 
   if (initializing) {
     return (
@@ -648,26 +393,37 @@ The final output will be a set of three distinct, full-frame images from this sc
         <Header remainingCredits={remainingCredits} isQuotaLoading={isQuotaLoading} />
         <main className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           <div className="flex flex-col gap-8">
-            <PromptForm 
-              formData={formData} 
-              onFormChange={handleFormChange}
-              onFileChange={handleFileChange}
-              onFileRemove={handleFileRemove}
-              onGenerate={handleGenerate}
-              isLoading={isLoading}
-            />
-            <HistoryPanel history={history} onRestore={handleRestoreHistory} isLoading={isHistoryLoading} />
+            <Suspense fallback={<ComponentLoader />}>
+              <PromptForm 
+                formData={formData} 
+                onFormChange={handleFormChange}
+                onFileChange={handleFileChange}
+                onFileRemove={handleFileRemove}
+                onGenerate={handleGenerate}
+                isLoading={isLoading}
+              />
+            </Suspense>
+            <Suspense fallback={<ComponentLoader />}>
+              <HistoryPanel 
+                history={history} 
+                onRestore={handleRestoreHistory}
+                onDelete={handleDeleteHistory}
+                isLoading={isHistoryLoading} 
+              />
+            </Suspense>
           </div>
           <div className="sticky top-8">
-            <PromptDisplay 
-              prompt={generatedPrompt} 
-              images={images}
-              isLoading={isLoading}
-              error={error}
-              productName={formData.productName}
-              onGenerateVideo={handleGenerateVideo}
-              aspectRatio={formData.aspectRatio}
-            />
+            <Suspense fallback={<ComponentLoader />}>
+              <PromptDisplay 
+                prompt={generatedPrompt} 
+                images={images}
+                isLoading={isLoading}
+                error={error}
+                productName={formData.productName}
+                onGenerateVideo={handleGenerateVideo}
+                aspectRatio={formData.aspectRatio}
+              />
+            </Suspense>
           </div>
         </main>
         <footer className="text-center py-8 mt-8 text-slate-500 text-sm">
@@ -679,9 +435,13 @@ The final output will be a set of three distinct, full-frame images from this sc
 };
 
 const App: React.FC = () => (
-  <TranslationProvider>
-    <AppContent />
-  </TranslationProvider>
+  <ErrorBoundary>
+    <TranslationProvider>
+      <ApiProvider>
+        <AppContent />
+      </ApiProvider>
+    </TranslationProvider>
+  </ErrorBoundary>
 );
 
 export default App;

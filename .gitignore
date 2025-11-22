@@ -12,6 +12,16 @@ dist
 dist-ssr
 *.local
 
+# Environment variables - 重要：不要提交包含 API Key 的環境變數檔案
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# GitHub Actions artifacts
+.github/workflows/*.log
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

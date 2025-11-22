@@ -16,7 +16,7 @@ interface PromptDisplayProps {
   aspectRatio: string;
 }
 
-const PromptDisplay: React.FC<PromptDisplayProps> = ({
+const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
   prompt,
   images,
   isLoading,
@@ -57,10 +57,13 @@ const PromptDisplay: React.FC<PromptDisplayProps> = ({
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="flex flex-col items-center justify-center h-full text-slate-400">
+        <div className="flex flex-col items-center justify-center h-full text-slate-400 space-y-4">
           <SpinnerIcon className="w-12 h-12 animate-spin text-blue-500" />
-          <p className="mt-4 text-lg">{t.promptDisplay.loadingTitle}</p>
-          <p className="text-sm">{t.promptDisplay.loadingNote}</p>
+          <div className="text-center">
+            <p className="text-lg font-medium">{t.promptDisplay.loadingTitle}</p>
+            <p className="text-sm mt-2">{t.promptDisplay.loadingNote}</p>
+          </div>
+          {/* 如果有進度資訊，可以在這裡顯示 */}
         </div>
       );
     }
@@ -222,6 +225,8 @@ const PromptDisplay: React.FC<PromptDisplayProps> = ({
       </div>
     </div>
   );
-};
+});
+
+PromptDisplay.displayName = 'PromptDisplay';
 
 export default PromptDisplay;

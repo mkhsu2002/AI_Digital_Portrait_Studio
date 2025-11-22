@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 - 頁面不存在</title>
+  <script>
+    // GitHub Pages 404 處理
+    // 如果使用 base path，需要調整路徑
+    const basePath = window.location.pathname.split('/').slice(0, -1).join('/') || '';
+    const redirectPath = basePath + '/index.html';
+    
+    // 嘗試重新導向到首頁
+    if (window.location.pathname !== redirectPath) {
+      window.location.replace(redirectPath);
+    }
+  </script>
+</head>
+<body>
+  <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif;">
+    <h1>404 - 頁面不存在</h1>
+    <p>正在重新導向到首頁...</p>
+    <p>如果沒有自動重新導向，請<a href="/">點擊這裡</a>返回首頁。</p>
+  </div>
+</body>
+</html>
+

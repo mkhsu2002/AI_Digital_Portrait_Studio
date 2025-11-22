@@ -29,12 +29,16 @@ interface PromptFormProps {
 const FileInput: React.FC<{
   label: string;
   name: "faceImage" | "objectImage";
-  file: { name: string } | null;
+  file: { name: string; data?: string; mimeType?: string } | null;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onFileRemove: (name: "faceImage" | "objectImage") => void;
   selectLabel: string;
   removeLabel: string;
 }> = ({ label, name, file, onFileChange, onFileRemove, selectLabel, removeLabel }) => {
+  const previewUrl = file?.data 
+    ? `data:${file.mimeType || 'image/png'};base64,${file.data}` 
+    : null;
+
   return (
     <InputGroup label={label}>
       {!file ? (
@@ -53,23 +57,34 @@ const FileInput: React.FC<{
           />
         </label>
       ) : (
-        <div className="w-full flex items-center justify-between bg-slate-700 border border-slate-600 rounded-md px-3 py-2">
-          <span className="text-sm text-slate-200 truncate pr-2">{file.name}</span>
-          <button
-            type="button"
-            onClick={() => onFileRemove(name)}
-            className="p-1 rounded-full hover:bg-slate-600 text-slate-400 hover:text-slate-100 transition-colors"
-            aria-label={removeLabel}
-          >
-            <RemoveIcon className="w-4 h-4" />
-          </button>
+        <div className="w-full space-y-2">
+          <div className="flex items-center justify-between bg-slate-700 border border-slate-600 rounded-md px-3 py-2">
+            <span className="text-sm text-slate-200 truncate pr-2">{file.name}</span>
+            <button
+              type="button"
+              onClick={() => onFileRemove(name)}
+              className="p-1 rounded-full hover:bg-slate-600 text-slate-400 hover:text-slate-100 transition-colors flex-shrink-0"
+              aria-label={removeLabel}
+            >
+              <RemoveIcon className="w-4 h-4" />
+            </button>
+          </div>
+          {previewUrl && (
+            <div className="bg-slate-700 border border-slate-600 rounded-md p-2">
+              <img
+                src={previewUrl}
+                alt={`${label} preview`}
+                className="w-full h-32 object-contain rounded"
+              />
+            </div>
+          )}
         </div>
       )}
     </InputGroup>
   );
 };
 
-const PromptForm: React.FC<PromptFormProps> = ({
+const PromptForm: React.FC<PromptFormProps> = React.memo(({
   formData,
   onFormChange,
   onFileChange,
@@ -89,7 +104,9 @@ const PromptForm: React.FC<PromptFormProps> = ({
             name="productName"
             value={formData.productName}
             onChange={onFormChange}
+            maxLength={100}
             className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+            placeholder="例如：登山後背包"
           />
         </InputGroup>
 
@@ -165,9 +182,13 @@ const PromptForm: React.FC<PromptFormProps> = ({
             value={formData.additionalDescription}
             onChange={onFormChange}
             rows={3}
+            maxLength={500}
             className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
             placeholder={t.form.additionalPlaceholder}
           />
+          <div className="text-xs text-slate-400 mt-1 text-right">
+            {formData.additionalDescription.length}/500
+          </div>
         </InputGroup>
 
         <InputGroup label={t.form.modelGender}>
@@ -266,6 +287,8 @@ const PromptForm: React.FC<PromptFormProps> = ({
       </div>
     </div>
   );
-};
+});
+
+PromptForm.displayName = 'PromptForm';
 
 export default PromptForm;

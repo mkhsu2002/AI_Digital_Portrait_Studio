@@ -6,6 +6,8 @@ import {
   query,
   serverTimestamp,
   getDocs,
+  deleteDoc,
+  doc,
   DocumentData,
 } from "firebase/firestore";
 import type { HistoryItem, HistoryFormData } from "../types";
@@ -62,5 +64,10 @@ export const addHistoryRecord = async (uid: string, item: HistoryItem): Promise<
     images: item.images,
     createdAt: serverTimestamp(),
   });
+};
+
+export const deleteHistoryRecord = async (uid: string, recordId: string): Promise<void> => {
+  const recordRef = doc(db, "users", uid, "history", recordId);
+  await deleteDoc(recordRef);
 };
 
