@@ -48,14 +48,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    // 檢查 Firebase Auth 是否正確初始化
+    if (!auth) {
+      console.error('❌ Firebase Auth 未正確初始化，請檢查環境變數設定');
       setInitializing(false);
-    });
-    return unsubscribe;
+      return;
+    }
+
+    try {
+      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setUser(currentUser);
+        setInitializing(false);
+      });
+      return unsubscribe;
+    } catch (error) {
+      console.error('❌ Firebase Auth 初始化錯誤:', error);
+      setInitializing(false);
+    }
   }, []);
 
   const login = async (email: string, password: string) => {
+    if (!auth) {
+      throw new Error('Firebase Auth 未正確初始化，請檢查環境變數設定');
+    }
     try {
       await signInWithEmailAndPassword(auth, sanitizeEmail(email), password);
     } catch (err) {
@@ -64,6 +79,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (email: string, password: string) => {
+    if (!auth) {
+      throw new Error('Firebase Auth 未正確初始化，請檢查環境變數設定');
+    }
     try {
       await createUserWithEmailAndPassword(auth, sanitizeEmail(email), password);
     } catch (err) {
@@ -72,10 +90,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    if (!auth) {
+      console.warn('Firebase Auth 未正確初始化，無法登出');
+      return;
+    }
     await signOut(auth);
   };
 
   const resetPassword = async (email: string) => {
+    if (!auth) {
+      throw new Error('Firebase Auth 未正確初始化，請檢查環境變數設定');
+    }
     try {
       await sendPasswordResetEmail(auth, sanitizeEmail(email));
     } catch (err) {
