@@ -247,3 +247,5 @@ console.log('✅ 所有必要的環境變數都已設定');
 - [FIREBASE_CONFIG_REFERENCE.md](./FIREBASE_CONFIG_REFERENCE.md) - Firebase 設定參數參考
 
 
+
+

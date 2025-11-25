@@ -5,8 +5,9 @@ import ErrorBoundary from './components/ErrorBoundary';
 import SpinnerIcon from './components/icons/SpinnerIcon';
 import { useAuth } from './contexts/AuthContext';
 import { TranslationProvider, useTranslation } from './contexts/TranslationContext';
-import { ApiKeyProvider } from './contexts/ApiKeyContext';
+import { ApiKeyProvider, useApiKey } from './contexts/ApiKeyContext';
 import { ApiProvider, useApi } from './contexts/ApiContext';
+import ApiKeyInput from './components/ApiKeyInput';
 import { buildDisplayPrompt } from './utils/promptBuilder';
 import { validateFormData } from './utils/validation';
 import { useDebounce } from './hooks/useDebounce';
@@ -37,6 +38,7 @@ const AppContent: React.FC = () => {
   const { user, initializing } = useAuth();
   const { t } = useTranslation();
   const api = useApi();
+  const { isApiKeyAvailable } = useApiKey();
 
   // 使用自訂 Hooks 管理狀態
   const formDataHook = useFormData();
@@ -49,6 +51,7 @@ const AppContent: React.FC = () => {
   const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [showErrorToast, setShowErrorToast] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   // 使用防抖動處理 prompt 生成，減少不必要的重新計算
   const debouncedFormData = useDebounce(formData, 500);
@@ -59,6 +62,17 @@ const AppContent: React.FC = () => {
     const prompt = buildDisplayPrompt(debouncedFormData);
     setGeneratedPrompt(prompt);
   }, [debouncedFormData]);
+
+  // 檢查是否需要顯示 API Key 設定對話框
+  useEffect(() => {
+    if (user && !initializing && !isApiKeyAvailable()) {
+      // 延遲顯示，讓頁面先載入
+      const timer = setTimeout(() => {
+        setShowApiKeyModal(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [user, initializing, isApiKeyAvailable]);
 
   // 處理檔案變更錯誤
   const handleFileChangeWithError = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -207,6 +221,13 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="bg-slate-900 min-h-screen text-slate-100 font-sans p-4 sm:p-6 md:p-8">
+      {/* API Key 設定模態對話框 */}
+      {showApiKeyModal && (
+        <ApiKeyInput
+          showOnMount={true}
+          onClose={() => setShowApiKeyModal(false)}
+        />
+      )}
       {showErrorToast && error && (
         <ErrorToast
           message={error}
