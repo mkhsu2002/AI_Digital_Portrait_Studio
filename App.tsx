@@ -15,6 +15,7 @@ import { useImageGeneration } from './hooks/useImageGeneration';
 import { useVideoGeneration } from './hooks/useVideoGeneration';
 import { useHistory } from './hooks/useHistory';
 import { useQuota } from './hooks/useQuota';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { handleError, logError } from './utils/errorHandler';
 import FirebaseErrorDisplay from './components/FirebaseErrorDisplay';
 import ErrorToast from './components/ErrorToast';
