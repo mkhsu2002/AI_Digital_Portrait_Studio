@@ -253,7 +253,6 @@ const AppContent: React.FC = () => {
                 isLoading={imageGeneration.isLoading}
                 error={error || imageGeneration.error}
                 productName={formData.productName}
-                onGenerateVideo={handleGenerateVideo}
                 aspectRatio={formData.aspectRatio}
               />
             </Suspense>

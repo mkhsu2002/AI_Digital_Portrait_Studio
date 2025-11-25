@@ -1,9 +1,8 @@
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import type { ImageResult } from "../types";
 import ClipboardIcon from "./icons/ClipboardIcon";
 import CheckIcon from "./icons/CheckIcon";
 import SpinnerIcon from "./icons/SpinnerIcon";
-import DownloadIcon from "./icons/DownloadIcon";
 import { useTranslation } from "../contexts/TranslationContext";
 
 interface PromptDisplayProps {
@@ -12,7 +11,6 @@ interface PromptDisplayProps {
   isLoading: boolean;
   error: string | null;
   productName: string;
-  onGenerateVideo: (index: number) => void;
   aspectRatio: string;
 }
 
@@ -22,175 +20,17 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
   isLoading,
   error,
   productName,
-  onGenerateVideo,
   aspectRatio,
 }) => {
   const { t, translateShotLabel } = useTranslation();
-  const supportedVideoRatios = ["16:9", "9:16"];
-  const isVideoGenerationSupported = supportedVideoRatios.includes(aspectRatio);
   const [isCopied, setIsCopied] = useState(false);
-  const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null);
 
-  // 從頁面上已顯示的圖片元素讀取（完全繞過 CORS，因為圖片已經在頁面上）
-  const loadImageFromDisplayedElement = useCallback(async (imageSrc: string, index: number): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      // 尋找頁面上對應的圖片元素
-      const imgElements = document.querySelectorAll('img');
-      let targetImg: HTMLImageElement | null = null;
-      
-      const baseUrl = imageSrc.split('?')[0]; // 移除 query string 進行比對
-      
-      for (const img of imgElements) {
-        const imgSrc = img.src.split('?')[0];
-        // 比對 URL
-        if (img.src === imageSrc || imgSrc === baseUrl || img.src.includes(baseUrl) || imageSrc.includes(imgSrc)) {
-          targetImg = img as HTMLImageElement;
-          break;
-        }
-      }
-      
-      if (targetImg && targetImg.complete && targetImg.naturalWidth > 0 && targetImg.naturalHeight > 0) {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = targetImg.naturalWidth;
-          canvas.height = targetImg.naturalHeight;
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            reject(new Error('無法建立 Canvas 上下文'));
-            return;
-          }
-          
-          // 從已顯示的圖片元素繪製到 canvas（不會觸發 CORS，因為圖片已經在頁面上）
-          ctx.drawImage(targetImg, 0, 0);
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error('無法轉換 Canvas 為 Blob'));
-            }
-          }, 'image/jpeg', 0.95);
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error('無法從頁面讀取圖片'));
-        }
-      } else {
-        reject(new Error('找不到已載入的圖片元素'));
-      }
-    });
-  }, []);
-
-  // 透過 Canvas 載入圖片（繞過 CORS）- 必須在 handleDownload 之前定義
-  const loadImageViaCanvas = useCallback(async (imageSrc: string): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      // 設定超時（10 秒）
-      const timeout = setTimeout(() => {
-        reject(new Error('圖片載入超時，請檢查網路連線或稍後再試'));
-      }, 10000);
-      
-      img.onload = () => {
-        clearTimeout(timeout);
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            reject(new Error('無法建立 Canvas 上下文'));
-            return;
-          }
-          
-          ctx.drawImage(img, 0, 0);
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error('無法轉換 Canvas 為 Blob'));
-            }
-          }, 'image/jpeg', 0.95);
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error('未知錯誤'));
-        }
-      };
-      
-      img.onerror = () => {
-        clearTimeout(timeout);
-        reject(new Error('圖片載入失敗，可能是 CORS 設定問題。請檢查 Firebase Storage 的 CORS 設定，或使用瀏覽器的「另存圖片」功能。'));
-      };
-      
-      img.src = imageSrc;
-    });
-  }, []);
-
-  const handleDownload = useCallback(async (fileUrl: string, filename: string, index: number) => {
-    setDownloadingIndex(index);
-    try {
-      let blob: Blob;
-
-      // 處理 data URL
-      if (fileUrl.startsWith("data:")) {
-        const response = await fetch(fileUrl);
-        if (!response.ok) {
-          throw new Error(`下載失敗: ${response.status} ${response.statusText}`);
-        }
-        blob = await response.blob();
-      } 
-      // 處理 Firebase Storage URL（可能有 CORS 問題）
-      else if (fileUrl.includes('firebasestorage.googleapis.com')) {
-        // 策略 1：優先從頁面上已顯示的圖片元素讀取（完全繞過 CORS）
-        try {
-          blob = await loadImageFromDisplayedElement(fileUrl, index);
-        } catch (domError) {
-          // 策略 2：如果無法從 DOM 讀取，使用 Canvas 方式
-          blob = await loadImageViaCanvas(fileUrl);
-        }
-      }
-      // 處理一般 URL
-      else {
-        const response = await fetch(fileUrl, {
-          mode: 'cors',
-          credentials: 'omit',
-        });
-        
-        if (!response.ok) {
-          throw new Error(`下載失敗: ${response.status} ${response.statusText}`);
-        }
-        
-        blob = await response.blob();
-      }
-
-      // 建立下載連結
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      
-      // 清理
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 100);
-    } catch (err) {
-      console.error("Failed to download file:", err);
-      const errorMessage = err instanceof Error ? err.message : '下載失敗，請稍後再試';
-      alert(`下載失敗：${errorMessage}`);
-    } finally {
-      setDownloadingIndex(null);
-    }
-  }, [loadImageViaCanvas, loadImageFromDisplayedElement]);
-
-  const handleCopy = useCallback(() => {
+  const handleCopy = () => {
     navigator.clipboard.writeText(prompt).then(() => {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     });
-  }, [prompt]);
+  };
 
   const renderContent = () => {
     if (isLoading) {
@@ -266,10 +106,7 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
       return (
         <div className="grid grid-cols-1 gap-6">
           {images.map((image, index) => {
-            const sanitizedProductName = productName.replace(/\s+/g, "_");
-            const fileExtension = image.videoSrc ? "mp4" : "jpeg";
             const shotLabel = image.labelKey ? translateShotLabel(image.labelKey) : image.label;
-            const filename = `${sanitizedProductName}_${shotLabel}_${Date.now()}.${fileExtension}`;
 
             return (
               <div
@@ -296,55 +133,15 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
                     />
                   )}
                 </div>
-                <div className="p-4 space-y-3">
-                  {image.videoError && (
-                    <div className="bg-red-900/50 p-2 rounded-md text-red-300 text-xs text-center">
-                      {image.videoError}
-                    </div>
-                  )}
-                  {!image.videoSrc && (
-                    <button
-                      onClick={() => onGenerateVideo(index)}
-                      disabled={image.isGeneratingVideo || !isVideoGenerationSupported}
-                      title={
-                        isVideoGenerationSupported ? undefined : t.promptDisplay.videoUnsupported
-                      }
-                      className="w-full flex justify-center items-center gap-2 bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-teal-500 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-teal-500 disabled:bg-slate-600 disabled:cursor-not-allowed"
-                    >
-                      {image.isGeneratingVideo ? (
-                        <>
-                          <SpinnerIcon className="w-5 h-5 animate-spin" />
-                          {t.promptDisplay.generatingVideo}
-                        </>
-                      ) : (
-                        t.promptDisplay.generateVideo
-                      )}
-                    </button>
-                  )}
-                  {!isVideoGenerationSupported && (
-                    <p className="text-xs text-slate-400 text-center">
-                      {t.promptDisplay.videoUnsupported}
+                <div className="p-4">
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-center">
+                    <p className="text-sm text-slate-300 mb-1">
+                      <span className="font-semibold">{shotLabel}</span>
                     </p>
-                  )}
-                  <button
-                    onClick={() => handleDownload(image.videoSrc || image.src, filename, index)}
-                    disabled={downloadingIndex === index}
-                    className="w-full flex justify-center items-center gap-2 bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-500 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-slate-500 disabled:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {downloadingIndex === index ? (
-                      <>
-                        <SpinnerIcon className="w-5 h-5 animate-spin" />
-                        <span>下載中...</span>
-                      </>
-                    ) : (
-                      <>
-                        <DownloadIcon className="w-5 h-5" />
-                        {image.videoSrc
-                          ? t.promptDisplay.downloadVideoLabel(shotLabel)
-                          : t.promptDisplay.downloadImageLabel(shotLabel)}
-                      </>
-                    )}
-                  </button>
+                    <p className="text-xs text-slate-400">
+                      {t.promptDisplay.downloadHint}
+                    </p>
+                  </div>
                 </div>
               </div>
             );
