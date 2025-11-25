@@ -22,12 +22,21 @@ const BackgroundSelect: React.FC<BackgroundSelectProps> = ({ value, onChange, na
       }
     };
 
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+        setSelectedCategory(null);
+      }
+    };
+
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen]);
 
@@ -53,7 +62,15 @@ const BackgroundSelect: React.FC<BackgroundSelectProps> = ({ value, onChange, na
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-left text-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none transition flex items-center justify-between"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsOpen(!isOpen);
+          }
+        }}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-left text-slate-200 focus:ring-2 focus:ring-blue-500 focus:outline-none transition flex items-center justify-between hover:bg-slate-600"
       >
         <span className="truncate">
           {translateOption('background', value) || value}

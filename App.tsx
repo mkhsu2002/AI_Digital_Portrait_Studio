@@ -18,8 +18,6 @@ import { useQuota } from './hooks/useQuota';
 import { handleError, logError } from './utils/errorHandler';
 import FirebaseErrorDisplay from './components/FirebaseErrorDisplay';
 import { firebaseDiagnostics } from './firebase';
-import FirebaseErrorDisplay from './components/FirebaseErrorDisplay';
-import { firebaseDiagnostics } from './firebase';
 
 // 程式碼分割：延遲載入主要組件
 const PromptForm = lazy(() => import('./components/PromptForm'));
