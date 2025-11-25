@@ -31,6 +31,45 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
   const [isCopied, setIsCopied] = useState(false);
   const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null);
 
+  // 透過 Canvas 載入圖片（繞過 CORS）- 必須在 handleDownload 之前定義
+  const loadImageViaCanvas = useCallback(async (imageSrc: string): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            reject(new Error('無法建立 Canvas 上下文'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('無法轉換 Canvas 為 Blob'));
+            }
+          }, 'image/jpeg', 0.95);
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error('未知錯誤'));
+        }
+      };
+      
+      img.onerror = () => {
+        reject(new Error('圖片載入失敗，可能是 CORS 設定問題'));
+      };
+      
+      img.src = imageSrc;
+    });
+  }, []);
+
   const handleDownload = useCallback(async (fileUrl: string, filename: string, index: number) => {
     setDownloadingIndex(index);
     try {
@@ -81,45 +120,6 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
       setDownloadingIndex(null);
     }
   }, [loadImageViaCanvas]);
-
-  // 透過 Canvas 載入圖片（繞過 CORS）
-  const loadImageViaCanvas = useCallback(async (imageSrc: string): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            reject(new Error('無法建立 Canvas 上下文'));
-            return;
-          }
-          
-          ctx.drawImage(img, 0, 0);
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error('無法轉換 Canvas 為 Blob'));
-            }
-          }, 'image/jpeg', 0.95);
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error('未知錯誤'));
-        }
-      };
-      
-      img.onerror = () => {
-        reject(new Error('圖片載入失敗，可能是 CORS 設定問題'));
-      };
-      
-      img.src = imageSrc;
-    });
-  }, []);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(prompt).then(() => {
