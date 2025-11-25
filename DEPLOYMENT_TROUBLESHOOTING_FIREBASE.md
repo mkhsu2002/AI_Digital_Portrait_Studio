@@ -246,3 +246,4 @@ console.log('✅ 所有必要的環境變數都已設定');
 - [Vite 環境變數文檔](https://vitejs.dev/guide/env-and-mode.html)
 - [FIREBASE_CONFIG_REFERENCE.md](./FIREBASE_CONFIG_REFERENCE.md) - Firebase 設定參數參考
 
+

@@ -197,3 +197,4 @@ const FirebaseErrorDisplay: React.FC<FirebaseErrorDisplayProps> = ({
 
 export default FirebaseErrorDisplay;
 
+

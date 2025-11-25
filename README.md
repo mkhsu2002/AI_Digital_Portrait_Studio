@@ -1,5 +1,7 @@
 # AI Digital Portrait Studio
 
+**版本：v3.5** | [v3.0 穩定版（stablev3.0 分支）](https://github.com/mkhsu2002/AI_Digital_Portrait_Studio/tree/stablev3.0)
+
 「電商人像攝影棚」是一套基於 React + Vite 的網頁應用，整合 Google Gemini 影像模型與 Firebase 服務，協助品牌快速生成多視角的人像商品圖。專案已開源，歡迎自行部署並依需求調整。
 英語說明（English Guide）：[README.en.md](./README.en.md)
 

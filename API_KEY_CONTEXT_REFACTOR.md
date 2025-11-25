@@ -130,3 +130,4 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 3. **多 API Key 支援**：可以支援多個 API Key（如 Gemini API Key 和 Veo API Key）
 4. **API Key 更新通知**：當 API Key 變更時，可以通知相關組件
 
+
