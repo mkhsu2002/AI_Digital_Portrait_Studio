@@ -9,7 +9,7 @@ interface BackgroundSelectProps {
 }
 
 const BackgroundSelect: React.FC<BackgroundSelectProps> = ({ value, onChange, name }) => {
-  const { translateOption } = useTranslation();
+  const { translateOption, translateCategory, t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -95,7 +95,7 @@ const BackgroundSelect: React.FC<BackgroundSelectProps> = ({ value, onChange, na
                   onClick={() => handleSelect(customOption)}
                   className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-700 text-slate-200 text-sm"
                 >
-                  {customOption}
+                  {translateOption('background', customOption)}
                 </button>
                 <div className="border-t border-slate-700 my-2"></div>
                 {Object.keys(BACKGROUND_CATEGORIES).map((category) => (
@@ -104,7 +104,7 @@ const BackgroundSelect: React.FC<BackgroundSelectProps> = ({ value, onChange, na
                     onClick={() => handleCategoryClick(category)}
                     className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-700 text-slate-200 text-sm flex items-center justify-between"
                   >
-                    <span>{category}</span>
+                    <span>{translateCategory(category)}</span>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -112,7 +112,7 @@ const BackgroundSelect: React.FC<BackgroundSelectProps> = ({ value, onChange, na
                 ))}
                 <div className="border-t border-slate-700 my-2"></div>
                 <div className="px-3 py-2 text-xs text-slate-400">
-                  快速選擇
+                  {t.form.quickSelect}
                 </div>
                 {allBackgrounds.slice(0, 5).map((bg) => (
                   <button
@@ -136,10 +136,10 @@ const BackgroundSelect: React.FC<BackgroundSelectProps> = ({ value, onChange, na
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
-                  <span>返回</span>
+                  <span>{t.form.back}</span>
                 </button>
                 <div className="border-t border-slate-700 my-2"></div>
-                <div className="px-3 py-2 text-xs text-slate-400 mb-2">{selectedCategory}</div>
+                <div className="px-3 py-2 text-xs text-slate-400 mb-2">{translateCategory(selectedCategory)}</div>
                 {BACKGROUND_CATEGORIES[selectedCategory as keyof typeof BACKGROUND_CATEGORIES]?.map((bg) => (
                   <button
                     key={bg}

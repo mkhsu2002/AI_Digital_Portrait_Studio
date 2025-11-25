@@ -240,6 +240,30 @@ const optionLabels: Record<Language, OptionLabelMap> = {
   },
 };
 
+// 背景分類翻譯
+const backgroundCategoryLabels: Record<Language, Record<string, string>> = {
+  zh: {
+    "台灣": "台灣",
+    "日本": "日本",
+    "歐洲": "歐洲",
+    "美洲": "美洲",
+    "其他亞洲": "其他亞洲",
+    "室內/工作室": "室內/工作室",
+    "自然環境": "自然環境",
+    "都市街景": "都市街景",
+  },
+  en: {
+    "台灣": "Taiwan",
+    "日本": "Japan",
+    "歐洲": "Europe",
+    "美洲": "Americas",
+    "其他亞洲": "Other Asia",
+    "室內/工作室": "Indoor/Studio",
+    "自然環境": "Natural Environment",
+    "都市街景": "Urban Street",
+  },
+};
+
 interface HeaderTranslations {
   title: string;
   subtitle: string;
@@ -268,6 +292,8 @@ interface FormTranslations {
   generateButton: string;
   removeFile: string;
   generating: string;
+  back: string;
+  quickSelect: string;
 }
 
 interface PromptDisplayTranslations {
@@ -414,6 +440,8 @@ const translations: Record<Language, Translations> = {
       "generateButton": "產生圖片",
       "removeFile": "移除檔案",
       "generating": "正在產生圖片...",
+      "back": "返回",
+      "quickSelect": "快速選擇",
     },
     promptDisplay: {
       "title": "產生結果",
@@ -530,6 +558,8 @@ const translations: Record<Language, Translations> = {
       "generateButton": "Generate images",
       "removeFile": "Remove file",
       "generating": "Generating...",
+      "back": "Back",
+      "quickSelect": "Quick Select",
     },
     promptDisplay: {
       "title": "Generation Results",
@@ -623,6 +653,7 @@ interface TranslationContextValue {
   t: Translations;
   translateOption: (category: OptionCategory, value: string) => string;
   translateShotLabel: (key: ShotLabelKey) => string;
+  translateCategory: (category: string) => string;
 }
 
 const TranslationContext = createContext<TranslationContextValue | undefined>(undefined);
@@ -643,6 +674,8 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
       translateOption: (category, value) =>
         optionLabels[language][category][value] ?? value,
       translateShotLabel: (key) => translations[language].shotLabels[key] ?? key,
+      translateCategory: (category) =>
+        backgroundCategoryLabels[language][category] ?? category,
     }),
     [language]
   );
