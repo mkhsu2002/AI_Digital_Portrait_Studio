@@ -31,43 +31,31 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
   const [isCopied, setIsCopied] = useState(false);
   const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null);
 
-  // 從頁面上已載入的圖片元素讀取（完全繞過 CORS）
-  const loadImageFromDOM = useCallback(async (imageSrc: string, index: number): Promise<Blob> => {
+  // 透過 Canvas 載入圖片（繞過 CORS）- 必須在 handleDownload 之前定義
+  const loadImageViaCanvas = useCallback(async (imageSrc: string): Promise<Blob> => {
     return new Promise((resolve, reject) => {
-      // 嘗試找到頁面上對應的 img 元素
-      // 方法 1：使用 data attribute 或特定選擇器
-      const imgSelector = `img[data-image-index="${index}"]`;
-      let targetImg = document.querySelector(imgSelector) as HTMLImageElement;
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
       
-      // 方法 2：如果找不到，遍歷所有圖片元素尋找匹配的 src
-      if (!targetImg) {
-        const imgElements = document.querySelectorAll('img');
-        const baseUrl = imageSrc.split('?')[0]; // 移除 query string 進行比對
-        
-        for (const img of imgElements) {
-          const imgSrc = img.src.split('?')[0];
-          // 比對 URL（考慮可能的編碼差異）
-          if (img.src === imageSrc || imgSrc === baseUrl || img.src.includes(baseUrl)) {
-            targetImg = img as HTMLImageElement;
-            break;
-          }
-        }
-      }
+      // 設定超時（10 秒）
+      const timeout = setTimeout(() => {
+        reject(new Error('圖片載入超時，請檢查網路連線或稍後再試'));
+      }, 10000);
       
-      // 如果找到已載入的圖片元素，直接從它讀取
-      if (targetImg && targetImg.complete && targetImg.naturalWidth > 0) {
+      img.onload = () => {
+        clearTimeout(timeout);
         try {
           const canvas = document.createElement('canvas');
-          canvas.width = targetImg.naturalWidth;
-          canvas.height = targetImg.naturalHeight;
+          canvas.width = img.width;
+          canvas.height = img.height;
           const ctx = canvas.getContext('2d');
           
           if (!ctx) {
-            throw new Error('無法建立 Canvas 上下文');
+            reject(new Error('無法建立 Canvas 上下文'));
+            return;
           }
           
-          // 從已載入的圖片元素繪製到 canvas（不會觸發 CORS）
-          ctx.drawImage(targetImg, 0, 0);
+          ctx.drawImage(img, 0, 0);
           canvas.toBlob((blob) => {
             if (blob) {
               resolve(blob);
@@ -75,85 +63,17 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
               reject(new Error('無法轉換 Canvas 為 Blob'));
             }
           }, 'image/jpeg', 0.95);
-          return;
         } catch (error) {
-          // 如果從 DOM 讀取失敗，繼續嘗試其他方式
-          console.warn('無法從 DOM 讀取圖片，嘗試其他方式:', error);
+          reject(error instanceof Error ? error : new Error('未知錯誤'));
         }
-      }
-      
-      // 如果找不到或讀取失敗，使用傳統方式
-      reject(new Error('無法從 DOM 讀取圖片'));
-    });
-  }, []);
-
-  // 透過 Canvas 載入圖片（繞過 CORS）- 必須在 handleDownload 之前定義
-  const loadImageViaCanvas = useCallback(async (imageSrc: string): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      // 先嘗試不設定 crossOrigin（某些情況下可能有效）
-      let triedWithoutCORS = false;
-      
-      const tryLoad = (useCORS: boolean) => {
-        if (useCORS) {
-          img.crossOrigin = 'anonymous';
-        } else {
-          img.removeAttribute('crossOrigin');
-        }
-        
-        // 設定超時（15 秒）
-        const timeout = setTimeout(() => {
-          if (!triedWithoutCORS && useCORS) {
-            // 如果 CORS 方式失敗，嘗試不使用 CORS
-            triedWithoutCORS = true;
-            tryLoad(false);
-          } else {
-            reject(new Error('圖片載入超時，請檢查網路連線或稍後再試'));
-          }
-        }, 15000);
-        
-        img.onload = () => {
-          clearTimeout(timeout);
-          try {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            
-            if (!ctx) {
-              reject(new Error('無法建立 Canvas 上下文'));
-              return;
-            }
-            
-            ctx.drawImage(img, 0, 0);
-            canvas.toBlob((blob) => {
-              if (blob) {
-                resolve(blob);
-              } else {
-                reject(new Error('無法轉換 Canvas 為 Blob'));
-              }
-            }, 'image/jpeg', 0.95);
-          } catch (error) {
-            reject(error instanceof Error ? error : new Error('未知錯誤'));
-          }
-        };
-        
-        img.onerror = () => {
-          clearTimeout(timeout);
-          if (!triedWithoutCORS && useCORS) {
-            // 如果 CORS 方式失敗，嘗試不使用 CORS
-            triedWithoutCORS = true;
-            tryLoad(false);
-          } else {
-            reject(new Error('圖片載入失敗，可能是 CORS 設定問題'));
-          }
-        };
-        
-        img.src = imageSrc;
       };
       
-      // 先嘗試使用 CORS
-      tryLoad(true);
+      img.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error('圖片載入失敗，可能是 CORS 設定問題。請檢查 Firebase Storage 的 CORS 設定，或使用瀏覽器的「另存圖片」功能。'));
+      };
+      
+      img.src = imageSrc;
     });
   }, []);
 
@@ -170,51 +90,22 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
         }
         blob = await response.blob();
       } 
-      // 處理 Firebase Storage URL 或一般 URL（使用多層備援策略）
+      // 處理 Firebase Storage URL（可能有 CORS 問題）
+      else if (fileUrl.includes('firebasestorage.googleapis.com')) {
+        blob = await loadImageViaCanvas(fileUrl);
+      }
+      // 處理一般 URL
       else {
-        const isFirebaseStorageUrl = fileUrl.includes('firebasestorage.googleapis.com');
-        let lastError: Error | null = null;
+        const response = await fetch(fileUrl, {
+          mode: 'cors',
+          credentials: 'omit',
+        });
         
-        // 策略 1：優先從頁面上已載入的圖片元素讀取（完全繞過 CORS）
-        try {
-          blob = await loadImageFromDOM(fileUrl, index);
-        } catch (domError) {
-          lastError = domError instanceof Error ? domError : new Error(String(domError));
-          
-          // 策略 2：嘗試直接 fetch（適用於已設定 CORS 的情況）
-          try {
-            const response = await fetch(fileUrl, {
-              mode: 'cors',
-              credentials: 'omit',
-              headers: {
-                'Accept': isFirebaseStorageUrl ? 'image/*' : '*/*',
-              },
-            });
-            
-            if (!response.ok) {
-              throw new Error(`下載失敗: ${response.status} ${response.statusText}`);
-            }
-            
-            blob = await response.blob();
-          } catch (fetchError) {
-            lastError = fetchError instanceof Error ? fetchError : new Error(String(fetchError));
-            
-            // 策略 3：如果 fetch 失敗，嘗試使用 Canvas 方式（繞過 CORS）
-            try {
-              blob = await loadImageViaCanvas(fileUrl);
-            } catch (canvasError) {
-              // 所有策略都失敗
-              throw new Error(
-                `下載失敗：無法載入圖片。` +
-                `原因：${lastError.message}。` +
-                `\n\n建議解決方案：` +
-                `\n1. 檢查 Firebase Storage 的 CORS 設定` +
-                `\n2. 或等待圖片完全載入後再下載` +
-                `\n3. 或使用瀏覽器的「另存圖片」功能`
-              );
-            }
-          }
+        if (!response.ok) {
+          throw new Error(`下載失敗: ${response.status} ${response.statusText}`);
         }
+        
+        blob = await response.blob();
       }
 
       // 建立下載連結
@@ -238,7 +129,7 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
     } finally {
       setDownloadingIndex(null);
     }
-  }, [loadImageViaCanvas, loadImageFromDOM]);
+  }, [loadImageViaCanvas]);
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(prompt).then(() => {
@@ -348,16 +239,6 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
                       className="w-full h-full object-cover"
                       loading="lazy"
                       decoding="async"
-                      data-image-index={index}
-                      crossOrigin="anonymous"
-                      onError={(e) => {
-                        // 如果 CORS 失敗，移除 crossOrigin 屬性重試
-                        const img = e.currentTarget;
-                        if (img.crossOrigin === 'anonymous') {
-                          img.removeAttribute('crossOrigin');
-                          img.src = image.src; // 重新載入
-                        }
-                      }}
                     />
                   )}
                 </div>
