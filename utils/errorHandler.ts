@@ -184,16 +184,34 @@ export function handleError(error: unknown, userMessage?: string): AppError {
       };
     }
 
+    // CORS 相關錯誤
+    if (
+      errorMessage.includes('cors') ||
+      errorMessage.includes('cross-origin') ||
+      errorMessage.includes('access-control-allow-origin') ||
+      errorMessage.includes('無法載入圖片')
+    ) {
+      return {
+        type: ErrorType.NETWORK,
+        message: originalMessage,
+        originalError: error,
+        retryable: false,
+        userMessage: userMessage || '圖片載入失敗（CORS 限制）。請檢查 Firebase Storage 的 CORS 設定，或使用 data URL 格式的圖片。',
+      };
+    }
+
     // 網路相關錯誤
     if (
       errorMessage.includes('network') ||
       errorMessage.includes('timeout') ||
       errorMessage.includes('econnrefused') ||
-      errorMessage.includes('enotfound')
+      errorMessage.includes('enotfound') ||
+      errorMessage.includes('failed to download') ||
+      errorMessage.includes('failed to load')
     ) {
       return {
         type: ErrorType.NETWORK,
-        message: error.message,
+        message: originalMessage,
         originalError: error,
         retryable: true,
         userMessage: userMessage || '網路連線失敗，請檢查您的網路連線後重試',

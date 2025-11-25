@@ -76,6 +76,7 @@ export async function createBlobUrl(imageSrc: string): Promise<string> {
 
 /**
  * 從 Data URL 或 URL 解析圖片位元組（用於 API 呼叫）
+ * 支援 Firebase Storage URL（使用 Canvas 繞過 CORS）
  */
 export async function resolveImageBytes(src: string): Promise<{ imageBytes: string; mimeType: string }> {
   if (src.startsWith("data:")) {
@@ -89,13 +90,37 @@ export async function resolveImageBytes(src: string): Promise<{ imageBytes: stri
     };
   }
 
+  // 檢查是否是 Firebase Storage URL
+  const isFirebaseStorageUrl = src.includes('firebasestorage.googleapis.com');
+  
   // 從 URL 載入
-  const response = await fetch(src);
-  if (!response.ok) {
-    throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+  let blob: Blob;
+  try {
+    if (isFirebaseStorageUrl) {
+      // Firebase Storage URL：使用 Canvas 方式載入（繞過 CORS）
+      blob = await loadImageViaCanvas(src);
+    } else {
+      // 一般 URL：使用 fetch
+      const response = await fetch(src, {
+        mode: 'cors',
+        credentials: 'omit',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+      }
+      
+      blob = await response.blob();
+    }
+  } catch (error) {
+    // 如果 fetch 失敗且是 CORS 錯誤，嘗試使用 Canvas 方式
+    if (!isFirebaseStorageUrl && error instanceof TypeError && error.message.includes('fetch')) {
+      blob = await loadImageViaCanvas(src);
+    } else {
+      throw error;
+    }
   }
 
-  const blob = await response.blob();
   const dataUrl = await blobToBase64(blob);
   const match = dataUrl.match(/^data:(.*);base64,(.*)$/);
   
@@ -107,6 +132,55 @@ export async function resolveImageBytes(src: string): Promise<{ imageBytes: stri
     imageBytes: match[2],
     mimeType: match[1] || blob.type || "image/jpeg",
   };
+}
+
+/**
+ * 透過 Canvas 載入圖片（繞過 CORS 限制）
+ * 適用於 Firebase Storage 或其他有 CORS 限制的圖片資源
+ */
+async function loadImageViaCanvas(imageSrc: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    // 嘗試跨域載入（需要伺服器支援 CORS）
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+        
+        // 繪製圖片到 canvas
+        ctx.drawImage(img, 0, 0);
+        
+        // 轉換為 Blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to convert canvas to blob'));
+          }
+        }, 'image/jpeg', 0.95);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('Unknown error'));
+      }
+    };
+    
+    img.onerror = (event) => {
+      const errorMsg = `無法載入圖片：${imageSrc}。這可能是 CORS 設定問題。`;
+      console.error('Image load error:', event);
+      reject(new Error(errorMsg));
+    };
+    
+    // 設定圖片來源（觸發載入）
+    img.src = imageSrc;
+  });
 }
 
 /**
