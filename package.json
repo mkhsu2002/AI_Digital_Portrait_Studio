@@ -15,7 +15,7 @@
   "dependencies": {
     "@google/genai": "latest",
     "@react-hook/window-size": "^3.1.1",
-    "firebase": "^12.5.0",
+    "firebase": "^12.6.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
