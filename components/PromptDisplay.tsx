@@ -47,43 +47,83 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
         for (const img of imgElements) {
           const imgSrc = img.src.split('?')[0];
           // 比對 URL（考慮可能的編碼差異）
-          if (img.src === imageSrc || imgSrc === baseUrl || img.src.includes(baseUrl)) {
+          if (img.src === imageSrc || imgSrc === baseUrl || img.src.includes(baseUrl) || imageSrc.includes(imgSrc)) {
             targetImg = img as HTMLImageElement;
             break;
           }
         }
       }
       
-      // 如果找到已載入的圖片元素，直接從它讀取
-      if (targetImg && targetImg.complete && targetImg.naturalWidth > 0) {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = targetImg.naturalWidth;
-          canvas.height = targetImg.naturalHeight;
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            throw new Error('無法建立 Canvas 上下文');
-          }
-          
-          // 從已載入的圖片元素繪製到 canvas（不會觸發 CORS）
-          ctx.drawImage(targetImg, 0, 0);
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error('無法轉換 Canvas 為 Blob'));
+      // 如果找到圖片元素，嘗試從它讀取
+      if (targetImg) {
+        const tryReadFromImg = () => {
+          // 檢查圖片是否已載入且有實際內容
+          if (targetImg.complete && targetImg.naturalWidth > 0 && targetImg.naturalHeight > 0) {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = targetImg.naturalWidth;
+              canvas.height = targetImg.naturalHeight;
+              const ctx = canvas.getContext('2d');
+              
+              if (!ctx) {
+                reject(new Error('無法建立 Canvas 上下文'));
+                return;
+              }
+              
+              // 從已載入的圖片元素繪製到 canvas
+              // 注意：即使圖片沒有 CORS，如果它已經顯示在頁面上，我們仍然可以讀取
+              // 但如果圖片是從不同來源載入且沒有 CORS，Canvas 會拋出錯誤
+              try {
+                ctx.drawImage(targetImg, 0, 0);
+                canvas.toBlob((blob) => {
+                  if (blob) {
+                    resolve(blob);
+                  } else {
+                    reject(new Error('無法轉換 Canvas 為 Blob'));
+                  }
+                }, 'image/jpeg', 0.95);
+              } catch (canvasError) {
+                // Canvas 讀取失敗（可能是 CORS 問題），嘗試其他方式
+                console.warn('無法從 Canvas 讀取圖片（可能是 CORS 問題），嘗試其他方式:', canvasError);
+                reject(new Error('無法從 Canvas 讀取圖片'));
+              }
+            } catch (error) {
+              console.warn('無法從 DOM 讀取圖片，嘗試其他方式:', error);
+              reject(new Error('無法從 DOM 讀取圖片'));
             }
-          }, 'image/jpeg', 0.95);
-          return;
-        } catch (error) {
-          // 如果從 DOM 讀取失敗，繼續嘗試其他方式
-          console.warn('無法從 DOM 讀取圖片，嘗試其他方式:', error);
-        }
+          } else if (targetImg.complete) {
+            // 圖片載入完成但沒有內容（可能是 CORS 失敗導致無法載入）
+            reject(new Error('圖片載入失敗，無法從 DOM 讀取'));
+          } else {
+            // 圖片還在載入中，等待載入完成（最多等待 3 秒）
+            const timeout = setTimeout(() => {
+              reject(new Error('等待圖片載入超時'));
+            }, 3000);
+            
+            const onLoadHandler = () => {
+              clearTimeout(timeout);
+              targetImg.removeEventListener('load', onLoadHandler);
+              targetImg.removeEventListener('error', onErrorHandler);
+              tryReadFromImg();
+            };
+            
+            const onErrorHandler = () => {
+              clearTimeout(timeout);
+              targetImg.removeEventListener('load', onLoadHandler);
+              targetImg.removeEventListener('error', onErrorHandler);
+              reject(new Error('圖片載入失敗'));
+            };
+            
+            targetImg.addEventListener('load', onLoadHandler);
+            targetImg.addEventListener('error', onErrorHandler);
+          }
+        };
+        
+        tryReadFromImg();
+      } else {
+        // 如果找不到圖片元素，使用傳統方式
+        reject(new Error('找不到對應的圖片元素'));
       }
-      
-      // 如果找不到或讀取失敗，使用傳統方式
-      reject(new Error('無法從 DOM 讀取圖片'));
     });
   }, []);
 
@@ -349,9 +389,8 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
                       loading="lazy"
                       decoding="async"
                       data-image-index={index}
-                      crossOrigin="anonymous"
                       onError={(e) => {
-                        // 如果 CORS 失敗，移除 crossOrigin 屬性重試
+                        // 如果圖片載入失敗，嘗試移除可能的 crossOrigin 屬性重試
                         const img = e.currentTarget;
                         if (img.crossOrigin === 'anonymous') {
                           img.removeAttribute('crossOrigin');
