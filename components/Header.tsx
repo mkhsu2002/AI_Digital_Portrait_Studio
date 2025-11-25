@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTranslation } from '../contexts/TranslationContext';
+import ApiKeyInput from './ApiKeyInput';
 
 interface HeaderProps {
   remainingCredits: number | null;
@@ -29,20 +30,23 @@ const Header: React.FC<HeaderProps> = ({ remainingCredits, isQuotaLoading }) => 
           {t.header.languageToggleLabel}
         </button>
         {user && (
-          <div className="self-center sm:self-auto bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 flex flex-col sm:flex-row gap-2 sm:items-center">
-            <div>
-              <p className="font-semibold">{t.header.welcome(user.email ?? "")}</p>
-              <p className="text-slate-400 text-xs">
-                {t.header.credits(remainingCredits, isQuotaLoading)}
-              </p>
+          <>
+            <ApiKeyInput />
+            <div className="self-center sm:self-auto bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 flex flex-col sm:flex-row gap-2 sm:items-center">
+              <div>
+                <p className="font-semibold">{t.header.welcome(user.email ?? "")}</p>
+                <p className="text-slate-400 text-xs">
+                  {t.header.credits(remainingCredits, isQuotaLoading)}
+                </p>
+              </div>
+              <button
+                onClick={logout}
+                className="bg-slate-700 hover:bg-slate-600 transition-colors px-3 py-1.5 rounded-lg text-xs font-semibold"
+              >
+                {t.header.logout}
+              </button>
             </div>
-            <button
-              onClick={logout}
-              className="bg-slate-700 hover:bg-slate-600 transition-colors px-3 py-1.5 rounded-lg text-xs font-semibold"
-            >
-              {t.header.logout}
-            </button>
-          </div>
+          </>
         )}
       </div>
     </header>
