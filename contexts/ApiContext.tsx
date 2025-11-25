@@ -9,17 +9,7 @@ import { fetchGenerationQuota, consumeGenerationCredit } from '../services/usage
 import { retry, isRetryableError } from '../utils/retry';
 import { blobToBase64, resolveImageBytes } from '../utils/imageUtils';
 import { buildApiBasePrompt, addShotInstruction, addReferenceImageInstructions } from '../utils/promptBuilder';
-
-// 定義 AIStudio 介面
-declare global {
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-  interface Window {
-    aistudio?: AIStudio;
-  }
-}
+import { useApiKey } from './ApiKeyContext';
 
 interface ApiContextValue {
   // Gemini API 相關
@@ -43,35 +33,18 @@ interface ApiContextValue {
 
 const ApiContext = createContext<ApiContextValue | undefined>(undefined);
 
-// 安全地取得 API Key（僅在執行時檢查，不會暴露在程式碼中）
-const getApiKey = (): string => {
-  // 優先使用環境變數（部署時設定）
-  const envKey = import.meta.env.VITE_API_KEY;
-  if (envKey) {
-    return envKey;
-  }
-  
-  // 檢查是否有瀏覽器擴充功能提供的 API Key
-  // 這允許使用者透過擴充功能提供 API Key，而不需要設定環境變數
-  if (typeof window !== 'undefined' && window.aistudio) {
-    // 擴充功能會處理 API Key，這裡只做檢查
-    return '';
-  }
-  
-  return '';
-};
-
 export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // 使用 ApiKeyContext 統一管理 API Key
+  const apiKeyContext = useApiKey();
   
   // 檢查 API Key 是否可用
   const checkApiKeyAvailable = useCallback((): boolean => {
-    const apiKey = getApiKey();
-    return !!apiKey || !!(typeof window !== 'undefined' && window.aistudio);
-  }, []);
+    return apiKeyContext.isApiKeyAvailable();
+  }, [apiKeyContext]);
   
   // 初始化 Gemini AI 客戶端
   const getGeminiClient = useCallback((): GoogleGenAI | null => {
-    const apiKey = getApiKey();
+    const apiKey = apiKeyContext.getApiKey();
     
     // 如果有環境變數提供的 API Key，直接使用
     if (apiKey) {
@@ -79,7 +52,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     
     // 如果有擴充功能，擴充功能會自動注入 API Key
-    if (typeof window !== 'undefined' && window.aistudio) {
+    if (apiKeyContext.isUsingExtension()) {
       try {
         // 擴充功能會自動處理 API Key，傳入空字串即可
         return new GoogleGenAI({ apiKey: '' });
@@ -89,11 +62,11 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     
     return null;
-  }, []);
+  }, [apiKeyContext]);
   
   // 下載資源（統一處理，支援取消）
   const downloadResource = useCallback(async (url: string, signal?: AbortSignal): Promise<Blob> => {
-    const apiKey = getApiKey();
+    const apiKey = apiKeyContext.getApiKey();
     // 如果 URL 需要 API Key，自動附加
     const finalUrl = url.includes('?') 
       ? `${url}&key=${apiKey}` 
@@ -104,7 +77,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error(`Failed to download resource: ${response.status} ${response.statusText}`);
     }
     return response.blob();
-  }, []);
+  }, [apiKeyContext]);
   
   
   // 解析 Gemini 回應中的圖片候選
@@ -138,9 +111,12 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     
     // 檢查擴充功能（如果使用）
-    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-      await window.aistudio.openSelectKey();
-      throw new Error("Please select API Key in browser extension");
+    if (apiKeyContext.isUsingExtension()) {
+      const hasKey = await apiKeyContext.checkExtensionApiKey();
+      if (!hasKey) {
+        await apiKeyContext.openExtensionKeySelector();
+        throw new Error("Please select API Key in browser extension");
+      }
     }
     
     const basePrompt = buildApiBasePrompt(formData);
@@ -245,7 +221,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (imagePart.fileData?.fileUri) {
-        const apiKey = getApiKey();
+        const apiKey = apiKeyContext.getApiKey();
         const downloadUrl = imagePart.fileData.fileUri.includes("?") 
           ? `${imagePart.fileData.fileUri}&key=${apiKey}` 
           : `${imagePart.fileData.fileUri}?key=${apiKey}`;
@@ -314,7 +290,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isGeneratingVideo: false,
       videoError: null,
     }));
-  }, [getGeminiClient, extractCandidates, blobToBase64]);
+  }, [getGeminiClient, extractCandidates, apiKeyContext]);
   
   // 生成影片（支援取消）
   const generateVideo = useCallback(async (
@@ -328,9 +304,12 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     
     // 檢查擴充功能
-    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
-      await window.aistudio.openSelectKey();
-      throw new Error("Please select API Key in browser extension");
+    if (apiKeyContext.isUsingExtension()) {
+      const hasKey = await apiKeyContext.checkExtensionApiKey();
+      if (!hasKey) {
+        await apiKeyContext.openExtensionKeySelector();
+        throw new Error("Please select API Key in browser extension");
+      }
     }
     
     const { imageBytes, mimeType } = await resolveImageBytes(imageSrc);
@@ -405,12 +384,12 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error("Unable to retrieve video download link");
     }
 
-    const apiKey = getApiKey();
+    const apiKey = apiKeyContext.getApiKey();
     const separator = downloadLink.includes("?") ? "&" : "?";
     const signedUrl = `${downloadLink}${separator}alt=media&key=${apiKey}`;
     const videoBlob = await downloadResource(signedUrl, signal);
     return URL.createObjectURL(videoBlob);
-  }, [getGeminiClient, downloadResource, blobToBase64]);
+  }, [getGeminiClient, downloadResource, apiKeyContext]);
   
   // 上傳歷史圖片到 Storage
   const uploadHistoryImages = useCallback(async (
