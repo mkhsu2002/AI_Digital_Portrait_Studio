@@ -38,6 +38,9 @@ CORS_修復說明.md
 CORS_問題最終解決方案.md
 專案分析與優化建議報告.md
 專案分析與優化建議.md
+專案程式碼分析與優化建議.md
+社群分享貼文.md
+PROJECT_ANALYSIS.md
 
 # 優化與分析相關文檔（對部署無關，僅供開發參考）
 *OPTIMIZATION*.md
@@ -47,3 +50,9 @@ CORS_問題最終解決方案.md
 *REFACTOR*.md
 MERGE_SUMMARY*.md
 README_DEPLOYMENT_SUMMARY.md
+
+# API 呼叫方式分析（技術分析文檔，僅供開發參考）
+API_CALL_METHODS.md
+
+# 臨時說明文件
+GIT_檔案分類說明.md
