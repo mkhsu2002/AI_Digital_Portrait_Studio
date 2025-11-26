@@ -3,7 +3,9 @@ import type { ImageResult } from "../types";
 import ClipboardIcon from "./icons/ClipboardIcon";
 import CheckIcon from "./icons/CheckIcon";
 import SpinnerIcon from "./icons/SpinnerIcon";
+import DownloadIcon from "./icons/DownloadIcon";
 import { useTranslation } from "../contexts/TranslationContext";
+import { dataUrlToBlob } from "../utils/imageUtils";
 
 interface PromptDisplayProps {
   prompt: string;
@@ -24,12 +26,75 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
 }) => {
   const { t, translateShotLabel } = useTranslation();
   const [isCopied, setIsCopied] = useState(false);
+  const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(prompt).then(() => {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     });
+  };
+
+  const handleDownloadImage = async (image: ImageResult, index: number, shotLabel: string) => {
+    try {
+      setDownloadingIndex(index);
+
+      let blob: Blob;
+      let filename: string;
+
+      // 判斷圖片來源類型
+      if (image.src.startsWith("data:")) {
+        // Data URL 格式
+        blob = dataUrlToBlob(image.src);
+        const mimeMatch = image.src.match(/^data:(image\/[a-zA-Z0-9+.+-]+);base64,/);
+        const mimeType = mimeMatch?.[1] ?? "image/png";
+        const extension = mimeType.split("/")[1]?.toLowerCase() ?? "png";
+        filename = `${shotLabel}-${Date.now()}.${extension === "jpeg" ? "jpg" : extension}`;
+      } else {
+        // URL 格式（Firebase Storage 或其他）
+        const response = await fetch(image.src, {
+          mode: 'cors',
+          credentials: 'omit',
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+        }
+
+        blob = await response.blob();
+        
+        // 從 URL 或 Content-Type 取得副檔名
+        const url = new URL(image.src);
+        const urlPath = url.pathname;
+        const urlExtension = urlPath.split('.').pop()?.toLowerCase();
+        const contentType = response.headers.get('content-type');
+        const mimeExtension = contentType?.split('/')[1]?.toLowerCase();
+        const extension = urlExtension || mimeExtension || 'png';
+        
+        filename = `${shotLabel}-${Date.now()}.${extension === "jpeg" ? "jpg" : extension}`;
+      }
+
+      // 建立下載連結並觸發下載
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      // 使用 encodeURIComponent 處理中文檔名
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      // 清理：移除連結並釋放 Blob URL
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
+    } catch (error) {
+      console.error('下載圖片失敗:', error);
+      alert(error instanceof Error ? error.message : '下載圖片失敗，請稍後再試');
+    } finally {
+      setDownloadingIndex(null);
+    }
   };
 
   const renderContent = () => {
@@ -134,11 +199,33 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
                   )}
                 </div>
                 <div className="p-4">
-                  <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-center">
-                    <p className="text-sm text-slate-300 mb-1">
-                      <span className="font-semibold">{shotLabel}</span>
-                    </p>
-                    <p className="text-xs text-slate-400">
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-slate-300">
+                        <span className="font-semibold">{shotLabel}</span>
+                      </p>
+                      {!image.videoSrc && (
+                        <button
+                          onClick={() => handleDownloadImage(image, index, shotLabel)}
+                          disabled={downloadingIndex === index}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800"
+                          aria-label={t.promptDisplay.downloadImage}
+                        >
+                          {downloadingIndex === index ? (
+                            <>
+                              <SpinnerIcon className="w-4 h-4 animate-spin" />
+                              <span>{t.promptDisplay.downloading}</span>
+                            </>
+                          ) : (
+                            <>
+                              <DownloadIcon className="w-4 h-4" />
+                              <span>{t.promptDisplay.downloadImage}</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 text-center">
                       {t.promptDisplay.downloadHint}
                     </p>
                   </div>

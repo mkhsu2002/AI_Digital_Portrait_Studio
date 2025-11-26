@@ -312,6 +312,8 @@ interface PromptDisplayTranslations {
   downloadImageLabel: (label: string) => string;
   downloadVideoLabel: (label: string) => string;
   videoUnsupported: string;
+  downloadImage: string;
+  downloading: string;
 }
 
 interface HistoryTranslations {
@@ -455,6 +457,8 @@ const translations: Record<Language, Translations> = {
       "emptyTitle": "圖片將會顯示在這裡",
       "emptyDescription": "點擊「產生圖片」按鈕開始。",
       "downloadHint": "💡 提示：在圖片上按右鍵選擇「另存圖片」即可下載",
+      "downloadImage": "下載圖片",
+      "downloading": "下載中...",
     },
     history: {
       "title": "歷史紀錄",
@@ -567,8 +571,10 @@ const translations: Record<Language, Translations> = {
       "copied": "Copied!",
       "togglePrompt": "Show / hide prompt",
       "emptyTitle": "Images will appear here",
-      "emptyDescription": "Click “Generate images” to get started.",
+      "emptyDescription": "Click "Generate images" to get started.",
       "downloadHint": "💡 Tip: Right-click on the image and select \"Save image as\" to download",
+      "downloadImage": "Download image",
+      "downloading": "Downloading...",
     },
     history: {
       "title": "History",
