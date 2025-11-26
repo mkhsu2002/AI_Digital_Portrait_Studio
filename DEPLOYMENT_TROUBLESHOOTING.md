@@ -140,7 +140,6 @@
 
 **原因**：
 - API Key 未設定或無效
-- CORS 問題
 - API Key 使用限制
 
 **解決方案**：
@@ -149,11 +148,7 @@
    - 確認 API Key 已正確設定
    - 確認 API Key 有效且有配額
 
-2. **檢查 CORS 設定**
-   - Gemini API 通常不需要 CORS 設定
-   - 如果遇到 CORS 錯誤，檢查 API Key 的設定
-
-3. **檢查 API Key 限制**
+2. **檢查 API Key 限制**
    - 確認沒有設定 HTTP referrer 限制
    - 確認 IP 限制不會阻擋部署平台的 IP
 

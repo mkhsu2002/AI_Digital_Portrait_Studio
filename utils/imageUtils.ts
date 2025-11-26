@@ -93,7 +93,7 @@ function extractStoragePathFromUrl(url: string): string | null {
 }
 
 /**
- * 使用 Firebase Storage SDK 下載圖片（避免 CORS 問題）
+ * 使用 Firebase Storage SDK 下載圖片
  */
 export async function downloadImageFromFirebaseStorage(
   url: string,
@@ -101,66 +101,43 @@ export async function downloadImageFromFirebaseStorage(
 ): Promise<Blob> {
   // 如果提供了 storage 實例，使用 SDK 下載
   if (storageInstance) {
-    try {
-      const path = extractStoragePathFromUrl(url);
-      if (path) {
-        // 動態導入 Firebase Storage 函數
-        const { ref, getBytes } = await import('firebase/storage');
-        const storageRef = ref(storageInstance, path);
-        const bytes = await getBytes(storageRef);
-        
-        // 從 URL 取得 MIME 類型
-        const urlObj = new URL(url);
-        const pathname = urlObj.pathname;
-        const extension = pathname.split('.').pop()?.toLowerCase() || 'png';
-        const mimeType = extension === 'jpg' || extension === 'jpeg' 
-          ? 'image/jpeg' 
-          : extension === 'png' 
-          ? 'image/png' 
-          : 'image/png';
-        
-        // 將 bytes 轉換為 Blob
-        return new Blob([bytes], { type: mimeType });
-      }
-    } catch (sdkError) {
-      console.warn('Firebase Storage SDK 下載失敗，嘗試其他方式:', sdkError);
-      // 繼續執行 fallback 策略
+    const path = extractStoragePathFromUrl(url);
+    if (path) {
+      // 動態導入 Firebase Storage 函數
+      const { ref, getBytes } = await import('firebase/storage');
+      const storageRef = ref(storageInstance, path);
+      const bytes = await getBytes(storageRef);
+      
+      // 從 URL 取得 MIME 類型
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname;
+      const extension = pathname.split('.').pop()?.toLowerCase() || 'png';
+      const mimeType = extension === 'jpg' || extension === 'jpeg' 
+        ? 'image/jpeg' 
+        : extension === 'png' 
+        ? 'image/png' 
+        : 'image/png';
+      
+      // 將 bytes 轉換為 Blob
+      return new Blob([bytes], { type: mimeType });
     }
   }
 
-  // 回退策略 1：嘗試直接 fetch（不設定 mode: 'cors'，某些情況下可能有效）
-  try {
-    const response = await fetch(url, {
-      credentials: 'omit',
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to download: ${response.status} ${response.statusText}`);
-    }
-    
-    return await response.blob();
-  } catch (fetchError) {
-    // 回退策略 2：使用 Canvas 方式（不設定 crossOrigin）
-    try {
-      return await loadImageViaCanvasWithoutCORS(url);
-    } catch (canvasError1) {
-      // 回退策略 3：使用 Canvas 方式（設定 crossOrigin）
-      try {
-        return await loadImageViaCanvas(url);
-      } catch (canvasError2) {
-        throw new Error(
-          `無法下載圖片：所有下載方式都失敗。` +
-          `請檢查 Firebase Storage 的 CORS 設定。` +
-          `建議在 Firebase Console 中設定 CORS 規則以允許圖片下載。`
-        );
-      }
-    }
+  // 如果無法使用 SDK，嘗試直接 fetch
+  const response = await fetch(url, {
+    credentials: 'omit',
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
   }
+  
+  return await response.blob();
 }
 
 /**
  * 從 Data URL 或 URL 解析圖片位元組（用於 API 呼叫）
- * 支援 Firebase Storage URL（優先使用 fetch，失敗時使用 Canvas 繞過 CORS）
+ * 支援 Firebase Storage URL
  */
 export async function resolveImageBytes(src: string): Promise<{ imageBytes: string; mimeType: string }> {
   if (src.startsWith("data:")) {
@@ -211,8 +188,7 @@ export async function resolveImageBytes(src: string): Promise<{ imageBytes: stri
           // 所有策略都失敗，拋出原始錯誤
           throw new Error(
             `無法載入圖片：${src}。` +
-            `原因：${lastError.message}。` +
-            `這可能是 CORS 設定問題，請檢查 Firebase Storage 的 CORS 設定。`
+            `原因：${lastError.message}。`
           );
         }
       }
@@ -235,10 +211,9 @@ export async function resolveImageBytes(src: string): Promise<{ imageBytes: stri
 }
 
 /**
- * 透過 Canvas 載入圖片（繞過 CORS 限制）
- * 適用於 Firebase Storage 或其他有 CORS 限制的圖片資源
+ * 透過 Canvas 載入圖片（內部使用，用於 resolveImageBytes）
  */
-export async function loadImageViaCanvas(imageSrc: string): Promise<Blob> {
+async function loadImageViaCanvas(imageSrc: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     let triedWithoutCORS = false;
@@ -257,7 +232,7 @@ export async function loadImageViaCanvas(imageSrc: string): Promise<Blob> {
           triedWithoutCORS = true;
           tryLoad(false);
         } else {
-          reject(new Error('圖片載入超時，可能是網路連線問題或 CORS 設定不正確'));
+          reject(new Error('圖片載入超時，可能是網路連線問題'));
         }
       }, 10000);
       
@@ -297,7 +272,7 @@ export async function loadImageViaCanvas(imageSrc: string): Promise<Blob> {
           triedWithoutCORS = true;
           tryLoad(false);
         } else {
-          const errorMsg = `無法載入圖片：${imageSrc}。這可能是 CORS 設定問題。`;
+          const errorMsg = `無法載入圖片：${imageSrc}。`;
           console.error('Image load error:', event);
           reject(new Error(errorMsg));
         }
@@ -313,9 +288,9 @@ export async function loadImageViaCanvas(imageSrc: string): Promise<Blob> {
 }
 
 /**
- * 透過 Canvas 載入圖片（不設定 crossOrigin，某些情況下可能有效）
+ * 透過 Canvas 載入圖片（不設定 crossOrigin，內部使用）
  */
-export async function loadImageViaCanvasWithoutCORS(imageSrc: string): Promise<Blob> {
+async function loadImageViaCanvasWithoutCORS(imageSrc: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     // 不設定 crossOrigin，某些伺服器可能允許這種方式

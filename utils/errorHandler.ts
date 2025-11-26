@@ -194,9 +194,8 @@ export function handleError(error: unknown, userMessage?: string): AppError {
       };
     }
 
-    // CORS 相關錯誤
+    // 網路相關錯誤
     if (
-      errorMessage.includes('cors') ||
       errorMessage.includes('cross-origin') ||
       errorMessage.includes('access-control-allow-origin') ||
       errorMessage.includes('無法載入圖片')
@@ -206,7 +205,7 @@ export function handleError(error: unknown, userMessage?: string): AppError {
         message: originalMessage,
         originalError: error,
         retryable: false,
-        userMessage: userMessage || '圖片載入失敗（CORS 限制）。請檢查 Firebase Storage 的 CORS 設定，或使用 data URL 格式的圖片。',
+        userMessage: userMessage || '圖片載入失敗，請稍後再試。',
       };
     }
 

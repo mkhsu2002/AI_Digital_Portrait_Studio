@@ -94,7 +94,6 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         
         const response = await fetch(finalUrl, { 
           signal,
-          mode: 'cors',
           credentials: 'omit',
         });
         
