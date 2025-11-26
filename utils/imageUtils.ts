@@ -137,9 +137,12 @@ export async function downloadImageFromFirebaseStorage(
 
 /**
  * 從 Data URL 或 URL 解析圖片位元組（用於 API 呼叫）
- * 支援 Firebase Storage URL
+ * 支援 Firebase Storage URL，優先使用 Firebase Storage SDK
  */
-export async function resolveImageBytes(src: string): Promise<{ imageBytes: string; mimeType: string }> {
+export async function resolveImageBytes(
+  src: string,
+  storageInstance?: any
+): Promise<{ imageBytes: string; mimeType: string }> {
   if (src.startsWith("data:")) {
     const match = src.match(/^data:(.*);base64,(.*)$/);
     if (!match) {
@@ -156,44 +159,47 @@ export async function resolveImageBytes(src: string): Promise<{ imageBytes: stri
   
   // 從 URL 載入
   let blob: Blob;
-  let lastError: Error | null = null;
   
-  // 策略 1：優先嘗試直接 fetch（適用於已設定 CORS 的情況）
-  try {
-    const response = await fetch(src, {
-      mode: 'cors',
-      credentials: 'omit',
-      headers: {
-        'Accept': 'image/*',
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+  // 策略 1：如果是 Firebase Storage URL 且有 storage 實例，優先使用 SDK
+  if (isFirebaseStorageUrl && storageInstance) {
+    try {
+      blob = await downloadImageFromFirebaseStorage(src, storageInstance);
+    } catch (sdkError) {
+      // SDK 失敗，繼續使用 fallback 策略
+      console.warn('Firebase Storage SDK 載入失敗，使用 fallback 策略:', sdkError);
+      blob = await loadImageViaCanvasWithoutCORS(src);
     }
-    
-    blob = await response.blob();
-  } catch (error) {
-    lastError = error instanceof Error ? error : new Error(String(error));
-    
-    // 策略 2：如果是 Firebase Storage URL 或 CORS 錯誤，嘗試使用 Canvas 方式
-    if (isFirebaseStorageUrl || (error instanceof TypeError && error.message.includes('fetch'))) {
+  } else if (isFirebaseStorageUrl) {
+    // Firebase Storage URL 但沒有 storage 實例，使用 Canvas 方式
+    try {
+      blob = await loadImageViaCanvasWithoutCORS(src);
+    } catch (canvasError) {
+      // 如果 Canvas 也失敗，嘗試使用 CORS 方式
       try {
         blob = await loadImageViaCanvas(src);
-      } catch (canvasError) {
-        // 策略 3：如果 Canvas 也失敗，嘗試不設定 crossOrigin（某些情況下可能有效）
-        try {
-          blob = await loadImageViaCanvasWithoutCORS(src);
-        } catch (finalError) {
-          // 所有策略都失敗，拋出原始錯誤
-          throw new Error(
-            `無法載入圖片：${src}。` +
-            `原因：${lastError.message}。`
-          );
-        }
+      } catch (finalError) {
+        throw new Error(`無法載入圖片：${src}。`);
       }
-    } else {
-      throw lastError;
+    }
+  } else {
+    // 非 Firebase Storage URL，嘗試直接 fetch（不設定 mode: 'cors'）
+    try {
+      const response = await fetch(src, {
+        credentials: 'omit',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+      }
+      
+      blob = await response.blob();
+    } catch (fetchError) {
+      // Fetch 失敗，嘗試 Canvas 方式
+      try {
+        blob = await loadImageViaCanvasWithoutCORS(src);
+      } catch (canvasError) {
+        throw new Error(`無法載入圖片：${src}。`);
+      }
     }
   }
 
