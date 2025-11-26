@@ -12,7 +12,7 @@
 
 👉 <a href="https://portrait.icareu.tw/" target="_blank" rel="noopener noreferrer">https://portrait.icareu.tw/</a>
 
-若希望自行部署，請參考下方 GitHub/Cloudflare Pages 的部署指南！
+若希望自行部署，請參考下方 Cloudflare Pages 的部署指南！
 
 ## 📋 版本資訊
 
@@ -88,127 +88,7 @@
 
 ## 🚀 部署指南
 
-### 自動化部署（推薦）
-
-專案已設定 GitHub Actions 自動化部署流程。當您推送程式碼到 `main` 分支時，會自動執行建置和部署。
-
-#### GitHub Pages 部署
-
-**優點**：
-- ✅ 完全免費
-- ✅ 自動 HTTPS
-- ✅ 與 GitHub 整合良好
-- ✅ 自動部署（透過 GitHub Actions）
-
-**設定步驟**：
-
-1. **建立 GitHub Actions Workflow**
-   
-   在專案根目錄建立 `.github/workflows/deploy-pages.yml`：
-   ```yaml
-   name: Deploy to GitHub Pages
-   
-   on:
-     push:
-       branches:
-         - main
-     workflow_dispatch:
-   
-   permissions:
-     contents: read
-     pages: write
-     id-token: write
-   
-   jobs:
-     build:
-       runs-on: ubuntu-latest
-       steps:
-         - name: Checkout
-           uses: actions/checkout@v4
-         
-         - name: Setup Node.js
-           uses: actions/setup-node@v4
-           with:
-             node-version: '20'
-             cache: 'npm'
-         
-         - name: Install dependencies
-           run: npm ci
-         
-         - name: Build
-           run: npm run build
-           env:
-             VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
-             VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-             VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-             VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-             VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-             VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-             VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-             VITE_BASE_PATH: ${{ secrets.VITE_BASE_PATH || '/' }}
-         
-         - name: Setup Pages
-           uses: actions/configure-pages@v4
-         
-         - name: Upload artifact
-           uses: actions/upload-pages-artifact@v3
-           with:
-             path: './dist'
-     
-     deploy:
-       environment:
-         name: github-pages
-         url: ${{ steps.deployment.outputs.page_url }}
-       runs-on: ubuntu-latest
-       needs: build
-       steps:
-         - name: Deploy to GitHub Pages
-           id: deployment
-           uses: actions/deploy-pages@v4
-   ```
-
-2. **設定 GitHub Secrets**
-   - 前往 GitHub 倉庫 → **Settings** → **Secrets and variables** → **Actions**
-   - 點擊 **New repository secret**，新增以下 Secrets：
-     ```
-     VITE_API_KEY=你的_GEMINI_API_KEY（可選，但不建議，可待部署完成後，直接於登入後首頁上手動輸入 Gemini API Key，將API Key 儲存於本地，可降低外洩風險）
-     VITE_FIREBASE_API_KEY=你的_FIREBASE_API_KEY
-     VITE_FIREBASE_AUTH_DOMAIN=xxx.firebaseapp.com
-     VITE_FIREBASE_PROJECT_ID=你的_PROJECT_ID
-     VITE_FIREBASE_STORAGE_BUCKET=你的_STORAGE_BUCKET
-     VITE_FIREBASE_MESSAGING_SENDER_ID=你的_SENDER_ID
-     VITE_FIREBASE_APP_ID=你的_APP_ID
-     ```
-   - **重要**：如果倉庫名稱不是 `username.github.io`，需要額外設定：
-     ```
-     VITE_BASE_PATH=/你的倉庫名稱/
-     ```
-     例如：如果倉庫名稱是 `AI_Digital_Portrait_Studio`，則設定為 `/AI_Digital_Portrait_Studio/`
-
-3. **啟用 GitHub Pages**
-   - 前往 **Settings** → **Pages**
-   - 在 **Source** 選擇 **GitHub Actions**
-   - 儲存設定
-
-4. **推送程式碼**
-   ```bash
-   git add .
-   git commit -m "設定 GitHub Pages 部署"
-   git push origin main
-   ```
-
-5. **查看部署狀態**
-   - 前往 **Actions** 標籤查看部署進度
-   - 部署完成後，應用會自動發布到 `https://<username>.github.io/<repository-name>`
-
-**⚠️ 注意事項**：
-- GitHub Pages 會將所有環境變數暴露在前端程式碼中
-- 建議設定 API Key 的使用限制（配額、IP 限制）
-- 詳細安全說明請參考 [SECURITY.md](./SECURITY.md)
-
----
-
-#### Cloudflare Pages 部署
+### Cloudflare Pages 部署（推薦）
 
 **優點**：
 - ✅ 免費方案
@@ -290,50 +170,6 @@
 
 ---
 
-### 其他部署方式
-
-#### Vercel（推薦）
-
-**優點**：
-- ✅ 免費方案
-- ✅ 對 Vite 專案支援度最高
-- ✅ 自動 HTTPS 和 CDN
-- ✅ 環境變數管理介面最佳
-
-**設定步驟**：
-1. 前往 <a href="https://vercel.com" target="_blank" rel="noopener noreferrer">Vercel</a> 註冊並連結 GitHub
-2. 點擊 **New Project** → 選擇您的倉庫
-3. 在 **Environment Variables** 中設定所有環境變數
-4. 點擊 **Deploy**
-
-詳細說明請參考 [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
-
-#### Firebase Hosting
-
-**優點**：
-- ✅ 與 Firebase 服務整合良好
-- ✅ 免費方案
-
-**設定步驟**：
-```bash
-# 安裝 Firebase CLI
-npm install -g firebase-tools
-
-# 登入 Firebase
-firebase login
-
-# 初始化 Firebase Hosting
-firebase init hosting
-
-# 建置專案
-npm run build
-
-# 部署
-firebase deploy --only hosting
-```
-
----
-
 ### 部署檢查清單
 
 部署前請確認：
@@ -347,19 +183,6 @@ firebase deploy --only hosting
 ---
 
 ### 故障排除
-
-#### GitHub Pages 部署失敗
-
-1. **檢查 Actions 日誌**
-   - 前往 **Actions** 標籤查看錯誤訊息
-
-2. **確認 base path 設定**
-   - 如果倉庫名稱不是 `username.github.io`，必須設定 `VITE_BASE_PATH`
-   - 格式：`/倉庫名稱/`（前後都要有斜線）
-
-3. **確認 Secrets 設定**
-   - 檢查所有必要的 Secrets 是否都已設定
-   - 確認名稱與 workflow 檔案中一致
 
 #### Cloudflare Pages 部署失敗
 
@@ -415,11 +238,10 @@ firebase deploy --only hosting
 
 ### 詳細文檔
 
-- [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) - 完整部署指南
-- [QUICK_START_DEPLOYMENT.md](./QUICK_START_DEPLOYMENT.md) - 快速開始指南
+- [cloudflare-pages-setup.md](./cloudflare-pages-setup.md) - Cloudflare Pages 詳細設定指南
+- [CLOUDFLARE_ENV_SETUP.md](./CLOUDFLARE_ENV_SETUP.md) - Cloudflare 環境變數設定指南
 - [SECURITY.md](./SECURITY.md) - 安全部署指南
 - [API_KEY_CONTEXT_REFACTOR.md](./API_KEY_CONTEXT_REFACTOR.md) - API Key 統一管理說明（v3.5）
-- [cloudflare-pages-setup.md](./cloudflare-pages-setup.md) - Cloudflare Pages 詳細設定指南
 
 > ⚠️ **安全提醒**：部署到公開平台時，API Key 會暴露在前端程式碼中。建議使用 Firebase Cloud Functions 作為 API 代理，詳見 [SECURITY.md](./SECURITY.md)。
 
