@@ -55,5 +55,7 @@ export interface HistoryItem {
   id?: string;
   formData: HistoryFormData;
   images: ImageResult[];
+  /** 縮圖 URL 陣列（存放於 Firebase Storage，供 History 顯示） */
+  thumbnailUrls?: string[];
   createdAt?: number;
 }

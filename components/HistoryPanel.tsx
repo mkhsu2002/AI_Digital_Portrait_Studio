@@ -32,20 +32,22 @@ const HistoryPanel: React.FC<HistoryPanelProps> = React.memo(({ history, onResto
                     className="flex-1 flex items-center gap-4 p-3 rounded-lg bg-slate-700/50 hover:bg-slate-700 transition-colors text-left"
                     aria-label={t.history.restoreLabel(item.formData.productName)}
                   >
-                    <img
-                      src={item.images[0]?.src || ""}
-                      alt={item.formData.productName}
-                      className="w-16 h-16 rounded-md object-cover flex-shrink-0 border border-slate-600"
-                      loading="lazy"
-                      decoding="async"
-                      onError={(e) => {
-                        // 如果載入失敗，嘗試使用原始 URL
-                        const originalSrc = item.images[0]?.src;
-                        if (originalSrc && (e.target as HTMLImageElement).src !== originalSrc) {
-                          (e.target as HTMLImageElement).src = originalSrc;
-                        }
-                      }}
-                    />
+                    {/* 使用縮圖 URL（來自 Firebase Storage）或佔位圖 */}
+                    {(item.thumbnailUrls?.[0] || item.images[0]?.src) ? (
+                      <img
+                        src={item.thumbnailUrls?.[0] || item.images[0]?.src || ""}
+                        alt={item.formData.productName}
+                        className="w-16 h-16 rounded-md object-cover flex-shrink-0 border border-slate-600"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-md bg-slate-600 flex-shrink-0 border border-slate-600 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    )}
                     <div className="flex-grow overflow-hidden">
                       <p className="font-semibold text-slate-200 truncate">{item.formData.productName}</p>
                       <p className="text-sm text-slate-400 truncate">{`${styleLabel}, ${backgroundLabel}`}</p>

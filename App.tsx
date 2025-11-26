@@ -113,23 +113,24 @@ const AppContent: React.FC = () => {
     // v3.5: 已移除使用額度限制，使用者可使用自己的 API Key 無限制生成
 
     try {
-      // 生成圖片
+      // 生成圖片（保留在本地，Data URL 格式）
       const generatedImages = await imageGeneration.generateImages(formData);
 
-      // 上傳圖片到 Storage
-      let storedImages = generatedImages;
+      // 顯示生成的圖片（本地 Data URL）
+      imageGeneration.setImages(generatedImages);
+
+      // 上傳縮圖到 Firebase Storage（供 History 顯示）
+      let thumbnailUrls: string[] = [];
       try {
-        storedImages = await api.uploadHistoryImages(user.uid, generatedImages);
+        thumbnailUrls = await api.uploadHistoryThumbnails(user.uid, generatedImages);
       } catch (uploadError) {
         const appError = handleError(uploadError);
-        logError(appError, 'Upload History Images');
-        // 不中斷流程，繼續使用原始圖片
+        logError(appError, 'Upload History Thumbnails');
+        // 不中斷流程，History 會顯示佔位圖
       }
 
-      imageGeneration.setImages(storedImages);
-
-      // 儲存歷史紀錄
-      await history.saveHistoryRecord(formData, storedImages);
+      // 儲存歷史紀錄（包含縮圖 URL）
+      await history.saveHistoryRecord(formData, generatedImages, thumbnailUrls);
     } catch (err) {
       const appError = handleError(err);
       logError(appError, 'Generate Images');

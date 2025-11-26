@@ -7,7 +7,7 @@ import { storage } from "../firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
 import { fetchGenerationQuota, consumeGenerationCredit } from '../services/usageService';
 import { retry, isRetryableError } from '../utils/retry';
-import { blobToBase64, resolveImageBytes } from '../utils/imageUtils';
+import { blobToBase64, resolveImageBytes, createThumbnail } from '../utils/imageUtils';
 import { buildApiBasePrompt, addShotInstruction, addReferenceImageInstructions } from '../utils/promptBuilder';
 import { useApiKey } from './ApiKeyContext';
 
@@ -16,8 +16,8 @@ interface ApiContextValue {
   generateImages: (formData: FormDataState, shotLabels: Record<ShotLabelKey, string>) => Promise<ImageResult[]>;
   generateVideo: (imageSrc: string, aspectRatio: string) => Promise<string>;
   
-  // Firebase Storage 相關
-  uploadHistoryImages: (uid: string, images: ImageResult[]) => Promise<ImageResult[]>;
+  // Firebase Storage 相關（只上傳縮圖）
+  uploadHistoryThumbnails: (uid: string, images: ImageResult[]) => Promise<string[]>;
   
   // Firestore 相關
   loadUserHistory: (uid: string) => Promise<HistoryItem[]>;
@@ -426,39 +426,49 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return URL.createObjectURL(videoBlob);
   }, [getGeminiClient, downloadResource, apiKeyContext]);
   
-  // 上傳歷史圖片到 Storage
-  const uploadHistoryImages = useCallback(async (
+  /**
+   * ============================================================
+   * 上傳歷史縮圖到 Firebase Storage
+   * ============================================================
+   * 
+   * 重要架構說明：
+   * - 生成的原圖保留在本地（Data URL），供使用者直接下載
+   * - 只有縮圖上傳到 Firebase Storage，供 History 顯示
+   * - 這樣可以節省 Firebase 儲存空間，也避免 CORS 問題
+   * 
+   * ⚠️ 請勿修改此邏輯，除非完全理解架構設計
+   */
+  const uploadHistoryThumbnails = useCallback(async (
     uid: string,
     images: ImageResult[]
-  ): Promise<ImageResult[]> => {
+  ): Promise<string[]> => {
     if (!storage) {
-      console.warn("Firebase Storage is not initialized; history items will keep base64 data.");
-      return images;
+      console.warn("Firebase Storage is not initialized; returning empty thumbnails.");
+      return [];
     }
 
     const timestamp = Date.now();
-    const uploadedImages = await Promise.all(
+    const thumbnailUrls = await Promise.all(
       images.map(async (image, index) => {
         if (!image.src.startsWith("data:")) {
-          return image;
+          // 如果已經是 URL，直接返回（不應該發生）
+          return image.src;
         }
 
-        const dataUrlMatch = image.src.match(/^data:(image\/[a-zA-Z0-9+.+-]+);base64,/);
-        const mimeTypeFromDataUrl = dataUrlMatch?.[1] ?? "image/png";
-        const extensionRaw = mimeTypeFromDataUrl.split("/")[1]?.toLowerCase() ?? "png";
-        const extension = extensionRaw === "jpeg" ? "jpg" : extensionRaw;
-        const storageRef = ref(storage, `users/${uid}/history/${timestamp}-${index}.${extension}`);
-
-        await uploadString(storageRef, image.src, "data_url");
-        const downloadUrl = await getDownloadURL(storageRef);
-
-        return {
-          ...image,
-          src: downloadUrl,
-        };
+        try {
+          // 建立縮圖（最大 200x200）
+          const thumbnailDataUrl = await createThumbnail(image.src, 200);
+          
+          const storageRef = ref(storage, `users/${uid}/history/${timestamp}-${index}-thumb.jpg`);
+          await uploadString(storageRef, thumbnailDataUrl, "data_url");
+          return await getDownloadURL(storageRef);
+        } catch (error) {
+          console.error('Failed to create/upload thumbnail:', error);
+          return ''; // 返回空字串，History 會顯示佔位圖
+        }
       })
     );
-    return uploadedImages;
+    return thumbnailUrls;
   }, []);
   
   // Firestore 相關方法（直接使用現有服務）
@@ -486,7 +496,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     () => ({
       generateImages,
       generateVideo,
-      uploadHistoryImages,
+      uploadHistoryThumbnails,
       loadUserHistory,
       saveHistoryRecord,
       deleteHistoryRecord,
@@ -498,7 +508,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [
       generateImages,
       generateVideo,
-      uploadHistoryImages,
+      uploadHistoryThumbnails,
       loadUserHistory,
       saveHistoryRecord,
       deleteHistoryRecord,

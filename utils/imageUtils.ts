@@ -210,3 +210,65 @@ export function getFileExtensionFromMimeType(mimeType: string): string {
   const extensionRaw = mimeType.split("/")[1]?.toLowerCase() ?? "png";
   return extensionRaw === "jpeg" ? "jpg" : extensionRaw;
 }
+
+/**
+ * ============================================================
+ * 建立縮圖
+ * ============================================================
+ * 
+ * 將 Data URL 圖片縮小到指定尺寸，用於 History 顯示
+ * 
+ * @param dataUrl - 原圖的 Data URL
+ * @param maxSize - 最大邊長（預設 200px）
+ * @returns Promise<string> - 縮圖的 Data URL（JPEG 格式）
+ */
+export async function createThumbnail(dataUrl: string, maxSize: number = 200): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    
+    img.onload = () => {
+      try {
+        // 計算縮圖尺寸（保持比例）
+        let width = img.naturalWidth;
+        let height = img.naturalHeight;
+        
+        if (width > height) {
+          if (width > maxSize) {
+            height = Math.round(height * (maxSize / width));
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = Math.round(width * (maxSize / height));
+            height = maxSize;
+          }
+        }
+        
+        // 建立 Canvas 並繪製縮圖
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('無法建立 Canvas context'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // 導出為 JPEG（較小的檔案大小）
+        const thumbnailDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(thumbnailDataUrl);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    img.onerror = () => {
+      reject(new Error('無法載入圖片'));
+    };
+    
+    img.src = dataUrl;
+  });
+}

@@ -9,7 +9,7 @@ interface UseHistoryReturn {
   isLoading: boolean;
   error: string | null;
   loadHistory: () => Promise<void>;
-  saveHistoryRecord: (formData: FormDataState, images: HistoryItem['images']) => Promise<void>;
+  saveHistoryRecord: (formData: FormDataState, images: HistoryItem['images'], thumbnailUrls?: string[]) => Promise<void>;
   deleteHistoryRecord: (recordId: string) => Promise<void>;
   sanitizeFormDataForHistory: (data: FormDataState) => HistoryFormData;
   restoreFormDataFromHistory: (historyData: HistoryFormData) => FormDataState;
@@ -95,14 +95,27 @@ export const useHistory = (): UseHistoryReturn => {
     }
   }, [user, api]);
 
+  /**
+   * 儲存歷史紀錄
+   * 
+   * 架構說明：
+   * - images: 原圖保留 Data URL（本地），不上傳到 Firebase
+   * - thumbnailUrls: 縮圖 URL（已上傳到 Firebase Storage），供 History 顯示
+   */
   const saveHistoryRecord = useCallback(
-    async (formData: FormDataState, images: HistoryItem['images']) => {
+    async (formData: FormDataState, images: HistoryItem['images'], thumbnailUrls?: string[]) => {
       if (!user) return;
 
       try {
         const historySnapshot: HistoryItem = {
           formData: sanitizeFormDataForHistory(formData),
-          images: JSON.parse(JSON.stringify(images)),
+          // 不儲存原圖的 Data URL 到 Firestore（太大），只儲存基本資訊
+          images: images.map((img, index) => ({
+            ...img,
+            // 如果有縮圖 URL，使用縮圖；否則保留原始 src（但不會存到 Firestore）
+            src: thumbnailUrls?.[index] || '',
+          })),
+          thumbnailUrls: thumbnailUrls || [],
         };
 
         setHistory((prevHistory) => {
