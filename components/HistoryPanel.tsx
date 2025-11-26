@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { HistoryItem } from "../types";
 import HistoryIcon from "./icons/HistoryIcon";
 import { useTranslation } from "../contexts/TranslationContext";
@@ -14,14 +14,29 @@ interface HistoryPanelProps {
 const HistoryPanel: React.FC<HistoryPanelProps> = React.memo(({ history, onRestore, onDelete, isLoading = false }) => {
   const { t, translateOption } = useTranslation();
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const blobUrlsRef = useRef<Set<string>>(new Set());
 
   // 將 Firebase Storage URL 轉換為 Blob URL 以避免 CORS 問題
   useEffect(() => {
+    // 清理之前的 Blob URL
+    blobUrlsRef.current.forEach(url => {
+      URL.revokeObjectURL(url);
+    });
+    blobUrlsRef.current.clear();
+
+    if (history.length === 0) {
+      setImageUrls({});
+      return;
+    }
+
+    let cancelled = false;
     const loadImageUrls = async () => {
       const urls: Record<string, string> = {};
       
       await Promise.all(
         history.map(async (item) => {
+          if (cancelled) return;
+          
           const imageSrc = item.images[0]?.src;
           if (!imageSrc) return;
           
@@ -32,11 +47,17 @@ const HistoryPanel: React.FC<HistoryPanelProps> = React.memo(({ history, onResto
             // Firebase Storage URL，使用 SDK 載入並轉換為 Blob URL
             try {
               const blob = await downloadImageFromFirebaseStorage(imageSrc, storage);
-              urls[item.id || ''] = URL.createObjectURL(blob);
+              if (!cancelled) {
+                const blobUrl = URL.createObjectURL(blob);
+                blobUrlsRef.current.add(blobUrl);
+                urls[item.id || ''] = blobUrl;
+              }
             } catch (error) {
               console.error('Failed to load image:', error);
               // 如果載入失敗，使用原始 URL
-              urls[item.id || ''] = imageSrc;
+              if (!cancelled) {
+                urls[item.id || ''] = imageSrc;
+              }
             }
           } else {
             // 其他 URL 直接使用
@@ -45,22 +66,22 @@ const HistoryPanel: React.FC<HistoryPanelProps> = React.memo(({ history, onResto
         })
       );
       
-      setImageUrls(urls);
+      if (!cancelled) {
+        setImageUrls(urls);
+      }
     };
 
-    if (history.length > 0) {
-      loadImageUrls();
-    }
+    loadImageUrls();
 
-    // 清理 Blob URL
+    // 清理函數
     return () => {
-      Object.values(imageUrls).forEach(url => {
-        if (url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
+      cancelled = true;
+      blobUrlsRef.current.forEach(url => {
+        URL.revokeObjectURL(url);
       });
+      blobUrlsRef.current.clear();
     };
-  }, [history]);
+  }, [history.map(item => item.id + ':' + item.images[0]?.src).join(',')]); // 只依賴關鍵資訊，避免陣列引用問題
 
   return (
     <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
