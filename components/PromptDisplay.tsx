@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import type { ImageResult } from "../types";
 import ClipboardIcon from "./icons/ClipboardIcon";
 import CheckIcon from "./icons/CheckIcon";
@@ -28,72 +28,6 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
   const { t, translateShotLabel } = useTranslation();
   const [isCopied, setIsCopied] = useState(false);
   const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null);
-  const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
-  const blobUrlsRef = useRef<Set<string>>(new Set());
-
-  // 將 Firebase Storage URL 轉換為 Blob URL 以避免 CORS 問題
-  useEffect(() => {
-    // 清理之前的 Blob URL
-    blobUrlsRef.current.forEach(url => {
-      URL.revokeObjectURL(url);
-    });
-    blobUrlsRef.current.clear();
-
-    if (images.length === 0) {
-      setImageUrls({});
-      return;
-    }
-
-    let cancelled = false;
-    const loadImageUrls = async () => {
-      const urls: Record<number, string> = {};
-      
-      await Promise.all(
-        images.map(async (image, index) => {
-          if (cancelled) return;
-          
-          if (image.src.startsWith("data:")) {
-            // Data URL 直接使用
-            urls[index] = image.src;
-          } else if (image.src.includes('firebasestorage.googleapis.com')) {
-            // Firebase Storage URL，使用 SDK 載入並轉換為 Blob URL
-            try {
-              const blob = await downloadImageFromFirebaseStorage(image.src, storage);
-              if (!cancelled) {
-                const blobUrl = URL.createObjectURL(blob);
-                blobUrlsRef.current.add(blobUrl);
-                urls[index] = blobUrl;
-              }
-            } catch (error) {
-              console.error('Failed to load image:', error);
-              // 如果載入失敗，使用原始 URL
-              if (!cancelled) {
-                urls[index] = image.src;
-              }
-            }
-          } else {
-            // 其他 URL 直接使用
-            urls[index] = image.src;
-          }
-        })
-      );
-      
-      if (!cancelled) {
-        setImageUrls(urls);
-      }
-    };
-
-    loadImageUrls();
-
-    // 清理函數
-    return () => {
-      cancelled = true;
-      blobUrlsRef.current.forEach(url => {
-        URL.revokeObjectURL(url);
-      });
-      blobUrlsRef.current.clear();
-    };
-  }, [images.map(img => img.src).join(',')]); // 只依賴圖片 URL 字串，避免陣列引用問題
 
   const handleCopy = () => {
     navigator.clipboard.writeText(prompt).then(() => {
@@ -248,17 +182,11 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
                     />
                   ) : (
                     <img
-                      src={imageUrls[index] || image.src}
+                      src={image.src}
                       alt={`Generated image ${index + 1}`}
                       className="w-full h-full object-cover"
                       loading="lazy"
                       decoding="async"
-                      onError={(e) => {
-                        // 如果載入失敗，嘗試使用原始 URL
-                        if (imageUrls[index] && imageUrls[index] !== image.src) {
-                          (e.target as HTMLImageElement).src = image.src;
-                        }
-                      }}
                     />
                   )}
                 </div>

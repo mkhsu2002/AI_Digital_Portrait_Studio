@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 import type { HistoryItem } from "../types";
 import HistoryIcon from "./icons/HistoryIcon";
 import { useTranslation } from "../contexts/TranslationContext";
-import { downloadImageFromFirebaseStorage } from "../utils/imageUtils";
-import { storage } from "../firebase";
 
 interface HistoryPanelProps {
   history: HistoryItem[];
@@ -13,75 +11,6 @@ interface HistoryPanelProps {
 
 const HistoryPanel: React.FC<HistoryPanelProps> = React.memo(({ history, onRestore, onDelete, isLoading = false }) => {
   const { t, translateOption } = useTranslation();
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
-  const blobUrlsRef = useRef<Set<string>>(new Set());
-
-  // 將 Firebase Storage URL 轉換為 Blob URL 以避免 CORS 問題
-  useEffect(() => {
-    // 清理之前的 Blob URL
-    blobUrlsRef.current.forEach(url => {
-      URL.revokeObjectURL(url);
-    });
-    blobUrlsRef.current.clear();
-
-    if (history.length === 0) {
-      setImageUrls({});
-      return;
-    }
-
-    let cancelled = false;
-    const loadImageUrls = async () => {
-      const urls: Record<string, string> = {};
-      
-      await Promise.all(
-        history.map(async (item) => {
-          if (cancelled) return;
-          
-          const imageSrc = item.images[0]?.src;
-          if (!imageSrc) return;
-          
-          if (imageSrc.startsWith("data:")) {
-            // Data URL 直接使用
-            urls[item.id || ''] = imageSrc;
-          } else if (imageSrc.includes('firebasestorage.googleapis.com')) {
-            // Firebase Storage URL，使用 SDK 載入並轉換為 Blob URL
-            try {
-              const blob = await downloadImageFromFirebaseStorage(imageSrc, storage);
-              if (!cancelled) {
-                const blobUrl = URL.createObjectURL(blob);
-                blobUrlsRef.current.add(blobUrl);
-                urls[item.id || ''] = blobUrl;
-              }
-            } catch (error) {
-              console.error('Failed to load image:', error);
-              // 如果載入失敗，使用原始 URL
-              if (!cancelled) {
-                urls[item.id || ''] = imageSrc;
-              }
-            }
-          } else {
-            // 其他 URL 直接使用
-            urls[item.id || ''] = imageSrc;
-          }
-        })
-      );
-      
-      if (!cancelled) {
-        setImageUrls(urls);
-      }
-    };
-
-    loadImageUrls();
-
-    // 清理函數
-    return () => {
-      cancelled = true;
-      blobUrlsRef.current.forEach(url => {
-        URL.revokeObjectURL(url);
-      });
-      blobUrlsRef.current.clear();
-    };
-  }, [history.map(item => item.id + ':' + item.images[0]?.src).join(',')]); // 只依賴關鍵資訊，避免陣列引用問題
 
   return (
     <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
@@ -104,7 +33,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = React.memo(({ history, onResto
                     aria-label={t.history.restoreLabel(item.formData.productName)}
                   >
                     <img
-                      src={imageUrls[item.id || ''] || item.images[0]?.src || ""}
+                      src={item.images[0]?.src || ""}
                       alt={item.formData.productName}
                       className="w-16 h-16 rounded-md object-cover flex-shrink-0 border border-slate-600"
                       loading="lazy"
