@@ -177,7 +177,7 @@ export async function resolveImageBytes(src: string): Promise<{ imageBytes: stri
  * 透過 Canvas 載入圖片（繞過 CORS 限制）
  * 適用於 Firebase Storage 或其他有 CORS 限制的圖片資源
  */
-async function loadImageViaCanvas(imageSrc: string): Promise<Blob> {
+export async function loadImageViaCanvas(imageSrc: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     let triedWithoutCORS = false;
@@ -254,7 +254,7 @@ async function loadImageViaCanvas(imageSrc: string): Promise<Blob> {
 /**
  * 透過 Canvas 載入圖片（不設定 crossOrigin，某些情況下可能有效）
  */
-async function loadImageViaCanvasWithoutCORS(imageSrc: string): Promise<Blob> {
+export async function loadImageViaCanvasWithoutCORS(imageSrc: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     // 不設定 crossOrigin，某些伺服器可能允許這種方式

@@ -6,6 +6,7 @@ import SpinnerIcon from "./icons/SpinnerIcon";
 import DownloadIcon from "./icons/DownloadIcon";
 import { useTranslation } from "../contexts/TranslationContext";
 import { dataUrlToBlob } from "../utils/imageUtils";
+import { loadImageViaCanvas, loadImageViaCanvasWithoutCORS } from "../utils/imageUtils";
 
 interface PromptDisplayProps {
   prompt: string;
@@ -52,23 +53,46 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
         filename = `${shotLabel}-${Date.now()}.${extension === "jpeg" ? "jpg" : extension}`;
       } else {
         // URL 格式（Firebase Storage 或其他）
-        const response = await fetch(image.src, {
-          mode: 'cors',
-          credentials: 'omit',
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
-        }
-
-        blob = await response.blob();
+        const isFirebaseStorageUrl = image.src.includes('firebasestorage.googleapis.com');
         
-        // 從 URL 或 Content-Type 取得副檔名
+        try {
+          // 策略 1：優先嘗試直接 fetch（適用於已設定 CORS 的情況）
+          const response = await fetch(image.src, {
+            mode: 'cors',
+            credentials: 'omit',
+          });
+
+          if (!response.ok) {
+            throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+          }
+
+          blob = await response.blob();
+        } catch (fetchError) {
+          // 策略 2：如果是 Firebase Storage URL 或 CORS 錯誤，使用 Canvas 方式繞過 CORS
+          if (isFirebaseStorageUrl || (fetchError instanceof TypeError && fetchError.message.includes('fetch'))) {
+            try {
+              blob = await loadImageViaCanvas(image.src);
+            } catch (canvasError) {
+              // 策略 3：如果 Canvas 也失敗，嘗試不使用 CORS
+              try {
+                blob = await loadImageViaCanvasWithoutCORS(image.src);
+              } catch (finalError) {
+                throw new Error(
+                  `無法下載圖片：${image.src}。` +
+                  `這可能是 CORS 設定問題，請檢查 Firebase Storage 的 CORS 設定。`
+                );
+              }
+            }
+          } else {
+            throw fetchError;
+          }
+        }
+        
+        // 從 URL 或 Blob 類型取得副檔名
         const url = new URL(image.src);
         const urlPath = url.pathname;
         const urlExtension = urlPath.split('.').pop()?.toLowerCase();
-        const contentType = response.headers.get('content-type');
-        const mimeExtension = contentType?.split('/')[1]?.toLowerCase();
+        const mimeExtension = blob.type?.split('/')[1]?.toLowerCase();
         const extension = urlExtension || mimeExtension || 'png';
         
         filename = `${shotLabel}-${Date.now()}.${extension === "jpeg" ? "jpg" : extension}`;
