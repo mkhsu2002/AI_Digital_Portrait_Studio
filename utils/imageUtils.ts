@@ -1,26 +1,6 @@
 /**
  * 圖片處理工具函數
  * 統一管理圖片轉換、下載等邏輯
- * 
- * ============================================================
- * ⚠️ 重要說明：關於圖片下載與 CORS
- * ============================================================
- * 
- * 1. Firebase Storage 圖片顯示：
- *    - <img> 標籤可以直接顯示 Firebase Storage URL（不受 CORS 限制）
- *    - 這是瀏覽器的標準行為
- * 
- * 2. Firebase Storage 圖片下載：
- *    - 使用 fetch() 或 Firebase SDK 的 getBytes() 會觸發 CORS 錯誤
- *    - 解決方案：使用 Canvas 方式 - 先用 <img> 載入，再繪製到 Canvas 導出
- *    - 這是最簡單且不需要後端 CORS 設定的方法
- * 
- * 3. 請勿修改：
- *    - 不要嘗試用 fetch() 直接下載 Firebase Storage URL
- *    - 不要嘗試用 Firebase SDK 的 getBytes() 下載
- *    - 這些方法都會觸發 CORS 錯誤
- * 
- * ============================================================
  */
 
 /**
@@ -73,25 +53,11 @@ export function dataUrlToBlob(dataUrl: string): Blob {
 }
 
 /**
- * ============================================================
- * 圖片下載函數（使用 Canvas 方式，避免 CORS 問題）
- * ============================================================
- * 
- * 此函數用於下載任何可顯示的圖片 URL（包括 Firebase Storage）
- * 
- * 原理：
- * 1. 建立 <img> 元素載入圖片（<img> 不受 CORS 限制）
- * 2. 將圖片繪製到 Canvas
- * 3. 從 Canvas 導出為 Blob
- * 
- * 注意：不要使用 crossOrigin 屬性，否則會觸發 CORS 檢查
+ * 使用 Canvas 方式下載圖片
  */
 export async function downloadImageViaCanvas(imageUrl: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    
-    // ⚠️ 重要：不要設定 crossOrigin，否則會觸發 CORS 檢查
-    // img.crossOrigin = 'anonymous';  // 不要這樣做！
     
     const timeout = setTimeout(() => {
       reject(new Error('圖片載入超時（10秒）'));
@@ -126,8 +92,7 @@ export async function downloadImageViaCanvas(imageUrl: string): Promise<Blob> {
           1.0
         );
       } catch (error) {
-        // 如果 Canvas 被污染（tainted），會在這裡捕獲錯誤
-        reject(new Error('圖片下載失敗：Canvas 安全限制'));
+        reject(new Error('圖片下載失敗'));
       }
     };
     
@@ -142,16 +107,7 @@ export async function downloadImageViaCanvas(imageUrl: string): Promise<Blob> {
 }
 
 /**
- * ============================================================
  * 統一的圖片下載函數
- * ============================================================
- * 
- * 根據圖片來源類型選擇最佳下載方式：
- * - Data URL：直接轉換為 Blob
- * - 其他 URL（包括 Firebase Storage）：使用 Canvas 方式
- * 
- * @param imageSrc - 圖片來源（Data URL 或 HTTP URL）
- * @returns Promise<Blob> - 圖片 Blob
  */
 export async function downloadImage(imageSrc: string): Promise<Blob> {
   // Data URL 直接轉換

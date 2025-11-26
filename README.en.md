@@ -24,7 +24,7 @@ If you want to deploy it yourself, please refer to the GitHub/Cloudflare Pages d
 - ✅ **API Key Unified Management**: Use `ApiKeyContext` to centrally manage API Keys, supporting environment variables and browser extensions
 - ✅ **Firebase Error Handling Improvements**: Added environment variable validation and detailed error messages
 - ✅ **UI/UX Optimization**: Redesigned API Key setup popup, added keyboard shortcuts support (Ctrl+Enter / Cmd+Enter)
-- ✅ **Image Download Fix**: Fixed CORS issues for Firebase Storage image downloads
+- ✅ **Image Download**: Added download button for generated images, supporting mobile and desktop browsers
 - ✅ **Error Diagnosis Improvements**: Improved API Key processing and error diagnosis to ensure correct format
 - ✅ **Removed Usage Limits**: Users can use their own API Key for unlimited generation
 

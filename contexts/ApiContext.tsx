@@ -427,16 +427,8 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [getGeminiClient, downloadResource, apiKeyContext]);
   
   /**
-   * ============================================================
    * 上傳歷史縮圖到 Firebase Storage
-   * ============================================================
-   * 
-   * 重要架構說明：
-   * - 生成的原圖保留在本地（Data URL），供使用者直接下載
-   * - 只有縮圖上傳到 Firebase Storage，供 History 顯示
-   * - 這樣可以節省 Firebase 儲存空間，也避免 CORS 問題
-   * 
-   * ⚠️ 請勿修改此邏輯，除非完全理解架構設計
+   * 原圖保留在本地（Data URL），只上傳縮圖供 History 顯示
    */
   const uploadHistoryThumbnails = useCallback(async (
     uid: string,

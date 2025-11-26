@@ -36,20 +36,12 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
   };
 
   /**
-   * ============================================================
    * 圖片下載處理函數
-   * ============================================================
-   * 
-   * 使用 Canvas 方式下載圖片，避免 CORS 問題
-   * 詳細說明請參考 utils/imageUtils.ts
-   * 
-   * ⚠️ 請勿修改下載邏輯，除非完全理解 CORS 限制
    */
   const handleDownloadImage = async (image: ImageResult, index: number, shotLabel: string) => {
     try {
       setDownloadingIndex(index);
 
-      // 使用統一的下載函數（內部使用 Canvas 方式，避免 CORS）
       const blob = await downloadImage(image.src);
       
       // 產生檔名
