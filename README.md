@@ -146,7 +146,7 @@
    - 變數值不要包含多餘的空格或引號
    - 設定完成後需要重新部署才會生效
    
-   **詳細設定步驟**請參考：[CLOUDFLARE_ENV_SETUP.md](./CLOUDFLARE_ENV_SETUP.md)
+   **詳細設定步驟**請參考：[CLOUDFLARE_PAGES_SETUP.md](./CLOUDFLARE_PAGES_SETUP.md)
 
 4. **分支控制**
    - **生產分支**：`main`
@@ -166,7 +166,7 @@
 - Cloudflare Pages 會將所有環境變數暴露在前端程式碼中
 - 建議使用 Cloudflare 的環境變數管理功能，而非 GitHub Secrets
 - 確保 `VITE_BASE_PATH` 設為 `/`（除非使用自訂域名且設定子路徑）
-- 詳細設定請參考 [cloudflare-pages-setup.md](./cloudflare-pages-setup.md)
+- 詳細設定請參考 [CLOUDFLARE_PAGES_SETUP.md](./CLOUDFLARE_PAGES_SETUP.md)
 
 ---
 
@@ -238,8 +238,7 @@
 
 ### 詳細文檔
 
-- [cloudflare-pages-setup.md](./cloudflare-pages-setup.md) - Cloudflare Pages 詳細設定指南
-- [CLOUDFLARE_ENV_SETUP.md](./CLOUDFLARE_ENV_SETUP.md) - Cloudflare 環境變數設定指南
+- [CLOUDFLARE_PAGES_SETUP.md](./CLOUDFLARE_PAGES_SETUP.md) - Cloudflare Pages 完整設定指南
 - [SECURITY.md](./SECURITY.md) - 安全部署指南
 - [API_KEY_CONTEXT_REFACTOR.md](./API_KEY_CONTEXT_REFACTOR.md) - API Key 統一管理說明（v3.5）
 
