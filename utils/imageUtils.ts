@@ -75,14 +75,62 @@ export async function createBlobUrl(imageSrc: string): Promise<string> {
 }
 
 /**
+ * 從 Firebase Storage URL 提取路徑
+ */
+function extractStoragePathFromUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    // Firebase Storage URL 格式：https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?alt=media&token=...
+    const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^/]+\/o\/(.+)/);
+    if (pathMatch) {
+      // 解碼 URL 編碼的路徑
+      return decodeURIComponent(pathMatch[1]);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 使用 Firebase Storage SDK 下載圖片（避免 CORS 問題）
  */
-export async function downloadImageFromFirebaseStorage(url: string): Promise<Blob> {
-  // 如果已經有 Firebase Storage 實例，使用 SDK 下載
-  // 否則回退到 fetch 方式
+export async function downloadImageFromFirebaseStorage(
+  url: string,
+  storageInstance?: any
+): Promise<Blob> {
+  // 如果提供了 storage 實例，使用 SDK 下載
+  if (storageInstance) {
+    try {
+      const path = extractStoragePathFromUrl(url);
+      if (path) {
+        // 動態導入 Firebase Storage 函數
+        const { ref, getBytes } = await import('firebase/storage');
+        const storageRef = ref(storageInstance, path);
+        const bytes = await getBytes(storageRef);
+        
+        // 從 URL 取得 MIME 類型
+        const urlObj = new URL(url);
+        const pathname = urlObj.pathname;
+        const extension = pathname.split('.').pop()?.toLowerCase() || 'png';
+        const mimeType = extension === 'jpg' || extension === 'jpeg' 
+          ? 'image/jpeg' 
+          : extension === 'png' 
+          ? 'image/png' 
+          : 'image/png';
+        
+        // 將 bytes 轉換為 Blob
+        return new Blob([bytes], { type: mimeType });
+      }
+    } catch (sdkError) {
+      console.warn('Firebase Storage SDK 下載失敗，嘗試其他方式:', sdkError);
+      // 繼續執行 fallback 策略
+    }
+  }
+
+  // 回退策略 1：嘗試直接 fetch（不設定 mode: 'cors'，某些情況下可能有效）
   try {
     const response = await fetch(url, {
-      mode: 'cors',
       credentials: 'omit',
     });
     
@@ -91,9 +139,22 @@ export async function downloadImageFromFirebaseStorage(url: string): Promise<Blo
     }
     
     return await response.blob();
-  } catch (error) {
-    // 如果 fetch 失敗，嘗試使用 Canvas 方式
-    return loadImageViaCanvas(url);
+  } catch (fetchError) {
+    // 回退策略 2：使用 Canvas 方式（不設定 crossOrigin）
+    try {
+      return await loadImageViaCanvasWithoutCORS(url);
+    } catch (canvasError1) {
+      // 回退策略 3：使用 Canvas 方式（設定 crossOrigin）
+      try {
+        return await loadImageViaCanvas(url);
+      } catch (canvasError2) {
+        throw new Error(
+          `無法下載圖片：所有下載方式都失敗。` +
+          `請檢查 Firebase Storage 的 CORS 設定。` +
+          `建議在 Firebase Console 中設定 CORS 規則以允許圖片下載。`
+        );
+      }
+    }
   }
 }
 
