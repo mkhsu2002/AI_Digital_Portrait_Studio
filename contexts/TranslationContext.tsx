@@ -571,7 +571,7 @@ const translations: Record<Language, Translations> = {
       "copied": "Copied!",
       "togglePrompt": "Show / hide prompt",
       "emptyTitle": "Images will appear here",
-      "emptyDescription": "Click "Generate images" to get started.",
+      "emptyDescription": "Click \"Generate images\" to get started.",
       "downloadHint": "💡 Tip: Right-click on the image and select \"Save image as\" to download",
       "downloadImage": "Download image",
       "downloading": "Downloading...",
