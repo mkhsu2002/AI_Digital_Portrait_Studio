@@ -5,8 +5,7 @@ import CheckIcon from "./icons/CheckIcon";
 import SpinnerIcon from "./icons/SpinnerIcon";
 import DownloadIcon from "./icons/DownloadIcon";
 import { useTranslation } from "../contexts/TranslationContext";
-import { dataUrlToBlob, downloadImageFromFirebaseStorage } from "../utils/imageUtils";
-import { storage } from "../firebase";
+import { downloadImage } from "../utils/imageUtils";
 
 interface PromptDisplayProps {
   prompt: string;
@@ -36,47 +35,37 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
     });
   };
 
+  /**
+   * ============================================================
+   * 圖片下載處理函數
+   * ============================================================
+   * 
+   * 使用 Canvas 方式下載圖片，避免 CORS 問題
+   * 詳細說明請參考 utils/imageUtils.ts
+   * 
+   * ⚠️ 請勿修改下載邏輯，除非完全理解 CORS 限制
+   */
   const handleDownloadImage = async (image: ImageResult, index: number, shotLabel: string) => {
     try {
       setDownloadingIndex(index);
 
-      let blob: Blob;
-      let filename: string;
-
-      // 判斷圖片來源類型
-      if (image.src.startsWith("data:")) {
-        // Data URL 格式
-        blob = dataUrlToBlob(image.src);
-        const mimeMatch = image.src.match(/^data:(image\/[a-zA-Z0-9+.+-]+);base64,/);
-        const mimeType = mimeMatch?.[1] ?? "image/png";
-        const extension = mimeType.split("/")[1]?.toLowerCase() ?? "png";
-        filename = `${shotLabel}-${Date.now()}.${extension === "jpeg" ? "jpg" : extension}`;
-      } else {
-        // URL 格式（Firebase Storage 或其他）
-        // 使用統一下載函數，它會自動處理 Firebase Storage SDK 和 fallback 策略
-        blob = await downloadImageFromFirebaseStorage(image.src, storage);
-        
-        // 從 URL 或 Blob 類型取得副檔名
-        const url = new URL(image.src);
-        const urlPath = url.pathname;
-        const urlExtension = urlPath.split('.').pop()?.toLowerCase();
-        const mimeExtension = blob.type?.split('/')[1]?.toLowerCase();
-        const extension = urlExtension || mimeExtension || 'png';
-        
-        filename = `${shotLabel}-${Date.now()}.${extension === "jpeg" ? "jpg" : extension}`;
-      }
+      // 使用統一的下載函數（內部使用 Canvas 方式，避免 CORS）
+      const blob = await downloadImage(image.src);
+      
+      // 產生檔名
+      const extension = blob.type?.split('/')[1]?.toLowerCase() || 'png';
+      const filename = `${shotLabel}-${Date.now()}.${extension === "jpeg" ? "jpg" : extension}`;
 
       // 建立下載連結並觸發下載
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      // 使用 encodeURIComponent 處理中文檔名
       link.download = filename;
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
       
-      // 清理：移除連結並釋放 Blob URL
+      // 清理
       setTimeout(() => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);

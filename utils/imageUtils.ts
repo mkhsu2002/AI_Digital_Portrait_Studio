@@ -1,6 +1,26 @@
 /**
  * 圖片處理工具函數
- * 統一管理圖片轉換、上傳等邏輯
+ * 統一管理圖片轉換、下載等邏輯
+ * 
+ * ============================================================
+ * ⚠️ 重要說明：關於圖片下載與 CORS
+ * ============================================================
+ * 
+ * 1. Firebase Storage 圖片顯示：
+ *    - <img> 標籤可以直接顯示 Firebase Storage URL（不受 CORS 限制）
+ *    - 這是瀏覽器的標準行為
+ * 
+ * 2. Firebase Storage 圖片下載：
+ *    - 使用 fetch() 或 Firebase SDK 的 getBytes() 會觸發 CORS 錯誤
+ *    - 解決方案：使用 Canvas 方式 - 先用 <img> 載入，再繪製到 Canvas 導出
+ *    - 這是最簡單且不需要後端 CORS 設定的方法
+ * 
+ * 3. 請勿修改：
+ *    - 不要嘗試用 fetch() 直接下載 Firebase Storage URL
+ *    - 不要嘗試用 Firebase SDK 的 getBytes() 下載
+ *    - 這些方法都會觸發 CORS 錯誤
+ * 
+ * ============================================================
  */
 
 /**
@@ -53,100 +73,109 @@ export function dataUrlToBlob(dataUrl: string): Blob {
 }
 
 /**
- * 從 Data URL 或 URL 載入圖片並轉換為 Blob URL
- * 這可以減少記憶體使用，因為 Blob URL 不會將整個圖片載入記憶體
+ * ============================================================
+ * 圖片下載函數（使用 Canvas 方式，避免 CORS 問題）
+ * ============================================================
+ * 
+ * 此函數用於下載任何可顯示的圖片 URL（包括 Firebase Storage）
+ * 
+ * 原理：
+ * 1. 建立 <img> 元素載入圖片（<img> 不受 CORS 限制）
+ * 2. 將圖片繪製到 Canvas
+ * 3. 從 Canvas 導出為 Blob
+ * 
+ * 注意：不要使用 crossOrigin 屬性，否則會觸發 CORS 檢查
  */
-export async function createBlobUrl(imageSrc: string): Promise<string> {
-  let blob: Blob;
-
-  if (imageSrc.startsWith("data:")) {
-    // Data URL 轉 Blob
-    blob = dataUrlToBlob(imageSrc);
-  } else {
-    // 從 URL 載入
-    const response = await fetch(imageSrc);
-    if (!response.ok) {
-      throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
-    }
-    blob = await response.blob();
-  }
-
-  return URL.createObjectURL(blob);
-}
-
-/**
- * 從 Firebase Storage URL 提取路徑
- */
-function extractStoragePathFromUrl(url: string): string | null {
-  try {
-    const urlObj = new URL(url);
-    // Firebase Storage URL 格式：https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?alt=media&token=...
-    const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^/]+\/o\/(.+)/);
-    if (pathMatch) {
-      // 解碼 URL 編碼的路徑
-      return decodeURIComponent(pathMatch[1]);
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * 使用 Firebase Storage SDK 下載圖片
- */
-export async function downloadImageFromFirebaseStorage(
-  url: string,
-  storageInstance?: any
-): Promise<Blob> {
-  // 如果提供了 storage 實例，使用 SDK 下載
-  if (storageInstance) {
-    const path = extractStoragePathFromUrl(url);
-    if (path) {
-      // 動態導入 Firebase Storage 函數
-      const { ref, getBytes } = await import('firebase/storage');
-      const storageRef = ref(storageInstance, path);
-      const bytes = await getBytes(storageRef);
-      
-      // 從 URL 取得 MIME 類型
-      const urlObj = new URL(url);
-      const pathname = urlObj.pathname;
-      const extension = pathname.split('.').pop()?.toLowerCase() || 'png';
-      const mimeType = extension === 'jpg' || extension === 'jpeg' 
-        ? 'image/jpeg' 
-        : extension === 'png' 
-        ? 'image/png' 
-        : 'image/png';
-      
-      // 將 bytes 轉換為 Blob
-      return new Blob([bytes], { type: mimeType });
-    }
-  }
-
-  // 如果無法使用 SDK，嘗試直接 fetch
-  const response = await fetch(url, {
-    credentials: 'omit',
+export async function downloadImageViaCanvas(imageUrl: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    
+    // ⚠️ 重要：不要設定 crossOrigin，否則會觸發 CORS 檢查
+    // img.crossOrigin = 'anonymous';  // 不要這樣做！
+    
+    const timeout = setTimeout(() => {
+      reject(new Error('圖片載入超時（10秒）'));
+    }, 10000);
+    
+    img.onload = () => {
+      clearTimeout(timeout);
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('無法建立 Canvas context'));
+          return;
+        }
+        
+        // 繪製圖片到 Canvas
+        ctx.drawImage(img, 0, 0);
+        
+        // 導出為 Blob（使用 PNG 格式保持品質）
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('無法從 Canvas 導出圖片'));
+            }
+          },
+          'image/png',
+          1.0
+        );
+      } catch (error) {
+        // 如果 Canvas 被污染（tainted），會在這裡捕獲錯誤
+        reject(new Error('圖片下載失敗：Canvas 安全限制'));
+      }
+    };
+    
+    img.onerror = () => {
+      clearTimeout(timeout);
+      reject(new Error('圖片載入失敗'));
+    };
+    
+    // 開始載入圖片
+    img.src = imageUrl;
   });
-  
-  if (!response.ok) {
-    throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+}
+
+/**
+ * ============================================================
+ * 統一的圖片下載函數
+ * ============================================================
+ * 
+ * 根據圖片來源類型選擇最佳下載方式：
+ * - Data URL：直接轉換為 Blob
+ * - 其他 URL（包括 Firebase Storage）：使用 Canvas 方式
+ * 
+ * @param imageSrc - 圖片來源（Data URL 或 HTTP URL）
+ * @returns Promise<Blob> - 圖片 Blob
+ */
+export async function downloadImage(imageSrc: string): Promise<Blob> {
+  // Data URL 直接轉換
+  if (imageSrc.startsWith('data:')) {
+    return dataUrlToBlob(imageSrc);
   }
   
-  return await response.blob();
+  // 其他 URL 使用 Canvas 方式下載
+  return downloadImageViaCanvas(imageSrc);
 }
 
 /**
  * 從 Data URL 或 URL 解析圖片位元組（用於 API 呼叫）
- * 支援 Firebase Storage URL，優先使用 Firebase Storage SDK
+ * 
+ * 注意：此函數用於將圖片轉換為 base64 格式，供 Gemini API 使用
  */
 export async function resolveImageBytes(
-  src: string,
-  storageInstance?: any
+  src: string
 ): Promise<{ imageBytes: string; mimeType: string }> {
+  // Data URL 直接解析
   if (src.startsWith("data:")) {
     const match = src.match(/^data:(.*);base64,(.*)$/);
     if (!match) {
-      throw new Error("Failed to read image data");
+      throw new Error("無效的 Data URL 格式");
     }
     return {
       imageBytes: match[2],
@@ -154,191 +183,16 @@ export async function resolveImageBytes(
     };
   }
 
-  // 檢查是否是 Firebase Storage URL
-  const isFirebaseStorageUrl = src.includes('firebasestorage.googleapis.com');
+  // 其他 URL 使用 Canvas 方式載入
+  const blob = await downloadImageViaCanvas(src);
   
-  // 從 URL 載入
-  let blob: Blob;
+  // 將 Blob 轉換為 base64
+  const base64 = await blobToBase64(blob);
   
-  // 策略 1：如果是 Firebase Storage URL 且有 storage 實例，優先使用 SDK
-  if (isFirebaseStorageUrl && storageInstance) {
-    try {
-      blob = await downloadImageFromFirebaseStorage(src, storageInstance);
-    } catch (sdkError) {
-      // SDK 失敗，繼續使用 fallback 策略
-      console.warn('Firebase Storage SDK 載入失敗，使用 fallback 策略:', sdkError);
-      blob = await loadImageViaCanvasWithoutCORS(src);
-    }
-  } else if (isFirebaseStorageUrl) {
-    // Firebase Storage URL 但沒有 storage 實例，使用 Canvas 方式
-    try {
-      blob = await loadImageViaCanvasWithoutCORS(src);
-    } catch (canvasError) {
-      // 如果 Canvas 也失敗，嘗試使用 CORS 方式
-      try {
-        blob = await loadImageViaCanvas(src);
-      } catch (finalError) {
-        throw new Error(`無法載入圖片：${src}。`);
-      }
-    }
-  } else {
-    // 非 Firebase Storage URL，嘗試直接 fetch（不設定 mode: 'cors'）
-    try {
-      const response = await fetch(src, {
-        credentials: 'omit',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
-      }
-      
-      blob = await response.blob();
-    } catch (fetchError) {
-      // Fetch 失敗，嘗試 Canvas 方式
-      try {
-        blob = await loadImageViaCanvasWithoutCORS(src);
-      } catch (canvasError) {
-        throw new Error(`無法載入圖片：${src}。`);
-      }
-    }
-  }
-
-  const dataUrl = await blobToBase64(blob);
-  const match = dataUrl.match(/^data:(.*);base64,(.*)$/);
-  
-  if (!match) {
-    throw new Error("Failed to read image data");
-  }
-
   return {
-    imageBytes: match[2],
-    mimeType: match[1] || blob.type || "image/jpeg",
+    imageBytes: base64,
+    mimeType: blob.type || "image/png",
   };
-}
-
-/**
- * 透過 Canvas 載入圖片（內部使用，用於 resolveImageBytes）
- */
-async function loadImageViaCanvas(imageSrc: string): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    let triedWithoutCORS = false;
-    
-    const tryLoad = (useCORS: boolean) => {
-      if (useCORS) {
-        img.crossOrigin = 'anonymous';
-      } else {
-        img.removeAttribute('crossOrigin');
-      }
-      
-      // 設定超時（10 秒）
-      const timeout = setTimeout(() => {
-        if (!triedWithoutCORS && useCORS) {
-          // 如果 CORS 方式失敗，嘗試不使用 CORS
-          triedWithoutCORS = true;
-          tryLoad(false);
-        } else {
-          reject(new Error('圖片載入超時，可能是網路連線問題'));
-        }
-      }, 10000);
-      
-      img.onload = () => {
-        clearTimeout(timeout);
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            reject(new Error('Failed to get canvas context'));
-            return;
-          }
-          
-          // 繪製圖片到 canvas
-          ctx.drawImage(img, 0, 0);
-          
-          // 轉換為 Blob
-          canvas.toBlob((blob) => {
-            if (blob) {
-              resolve(blob);
-            } else {
-              reject(new Error('Failed to convert canvas to blob'));
-            }
-          }, 'image/jpeg', 0.95);
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error('Unknown error'));
-        }
-      };
-      
-      img.onerror = (event) => {
-        clearTimeout(timeout);
-        if (!triedWithoutCORS && useCORS) {
-          // 如果 CORS 方式失敗，嘗試不使用 CORS
-          triedWithoutCORS = true;
-          tryLoad(false);
-        } else {
-          const errorMsg = `無法載入圖片：${imageSrc}。`;
-          console.error('Image load error:', event);
-          reject(new Error(errorMsg));
-        }
-      };
-      
-      // 設定圖片來源（觸發載入）
-      img.src = imageSrc;
-    };
-    
-    // 先嘗試使用 CORS
-    tryLoad(true);
-  });
-}
-
-/**
- * 透過 Canvas 載入圖片（不設定 crossOrigin，內部使用）
- */
-async function loadImageViaCanvasWithoutCORS(imageSrc: string): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    // 不設定 crossOrigin，某些伺服器可能允許這種方式
-    
-    const timeout = setTimeout(() => {
-      reject(new Error('圖片載入超時'));
-    }, 10000);
-    
-    img.onload = () => {
-      clearTimeout(timeout);
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'));
-          return;
-        }
-        
-        ctx.drawImage(img, 0, 0);
-        
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Failed to convert canvas to blob'));
-          }
-        }, 'image/jpeg', 0.95);
-      } catch (error) {
-        reject(error instanceof Error ? error : new Error('Unknown error'));
-      }
-    };
-    
-    img.onerror = () => {
-      clearTimeout(timeout);
-      reject(new Error('無法載入圖片'));
-    };
-    
-    img.src = imageSrc;
-  });
 }
 
 /**
@@ -356,8 +210,3 @@ export function getFileExtensionFromMimeType(mimeType: string): string {
   const extensionRaw = mimeType.split("/")[1]?.toLowerCase() ?? "png";
   return extensionRaw === "jpeg" ? "jpg" : extensionRaw;
 }
-
-
-
-
-

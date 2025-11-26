@@ -347,7 +347,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     
-    const { imageBytes, mimeType } = await resolveImageBytes(imageSrc, storage);
+    const { imageBytes, mimeType } = await resolveImageBytes(imageSrc);
 
     if (signal?.aborted) {
       throw new Error('Request cancelled');
