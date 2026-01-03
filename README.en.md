@@ -1,6 +1,6 @@
 # AI Digital Portrait Studio
 
-**Version: v3.5**
+**Version: v3.8**
 
 AI Digital Portrait Studio is a React + Vite web application that integrates Google Gemini image models with Firebase services to help brands quickly generate multi-angle portrait product images. The project is open source—feel free to deploy and customize according to your needs.
 
@@ -16,19 +16,15 @@ If you want to deploy it yourself, please refer to the GitHub/Cloudflare Pages d
 
 ## 📋 Version Information
 
-### v3.5 (Latest Version)
+### v3.8 (Latest Version)
 
 **Major Changes**:
+- ✅ **Menu Options Optimization**: Optimized options for clothing styles, seasons, backgrounds, expressions, poses, and lighting to better suit commercial photography and portrait photography needs
+- ✅ **Commercial Photography Options Enhanced**: Added multiple options commonly used in commercial photography for styles, poses, and lighting
+- ✅ **Natural Scene Lighting Options**: Preserved and optimized natural scene lighting options (snow-reflected soft light, harsh midday sunlight, cloudy misty rainy atmosphere, etc.)
 - ✅ **Code Organization & Modularization**: Split business logic into multiple custom Hooks for better maintainability
 - ✅ **Error Handling Improvements**: Established unified error handling mechanism with user-friendly error messages
 - ✅ **API Key Unified Management**: Use `ApiKeyContext` to centrally manage API Keys, supporting environment variables and browser extensions
-- ✅ **Firebase Error Handling Improvements**: Added environment variable validation and detailed error messages
-- ✅ **UI/UX Optimization**: Redesigned API Key setup popup, added keyboard shortcuts support (Ctrl+Enter / Cmd+Enter)
-- ✅ **Image Download**: Added download button for generated images, supporting mobile and desktop browsers
-- ✅ **Error Diagnosis Improvements**: Improved API Key processing and error diagnosis to ensure correct format
-- ✅ **Removed Usage Limits**: Users can use their own API Key for unlimited generation
-
-**Detailed Changelog**: Please refer to [CHANGELOG_v3.5.md](./CHANGELOG_v3.5.md)
 
 ## Core Features
 

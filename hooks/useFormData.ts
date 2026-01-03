@@ -27,12 +27,12 @@ interface UseFormDataReturn {
 const DEFAULT_FORM_DATA: FormDataState = {
   productName: '登山後背包',
   clothingStyle: CLOTHING_STYLES[7], // 戶外休閒風
-  clothingSeason: CLOTHING_SEASONS[5], // 高山
+  clothingSeason: CLOTHING_SEASONS[5], // 春季過渡
   modelGender: MODEL_GENDERS[0],
-  background: BACKGROUNDS[0], // 台灣阿里山日出雲海
+  background: BACKGROUNDS[0], // 時尚攝影棚（純色背景）
   expression: EXPRESSIONS[0], // 自信，眼神直視鏡頭
   pose: FEMALE_POSES[0], // 預設女性姿勢
-  lighting: LIGHTING_CONDITIONS[0], // 光線條件良好的自然光
+  lighting: LIGHTING_CONDITIONS[0], // 柔和攝影棚光（商業攝影標準）
   aspectRatio: ASPECT_RATIOS[0], // 9:16
   faceImage: null,
   objectImage: null,
