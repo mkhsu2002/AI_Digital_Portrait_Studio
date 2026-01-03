@@ -259,8 +259,8 @@
 
 如果您對 AI 視覺行銷工具感興趣，歡迎同步參考以下相關專案：
 
-- **[AI-PM-Designer-Pro](https://github.com/mkhsu2002/AI-PM-Designer-Pro)** - AI 視覺行銷生產力工具，基於 Google Gemini 2.5 Flash 與 Gemini 3 Pro Image，從產品圖自動生成完整行銷素材包
-- **[EC_SEO_SA](https://github.com/mkhsu2002/EC_SEO_SA)** - 電商 SEO 與內容行銷工具
+- [AI-PM-Designer-Pro](https://github.com/mkhsu2002/AI-PM-Designer-Pro) - AI 視覺行銷生產力工具，基於 Google Gemini 2.5 Flash 與 Gemini 3 Pro Image，從產品圖自動生成完整行銷素材包
+- [AI EC SEO Booster](https://mkhsu2002.github.io/AI-EC-SEO-Booster/) - 由AI驅動的智能電商市場分析與 SEO 內容策略生成工具，透過 Google Gemini API 提供專業的市場洞察、競爭分析、買家人物誌描繪，並自動生成 SEO 優化的內容策略與前導頁提示詞。
 
 ## ☕ 請我喝杯咖啡
 
