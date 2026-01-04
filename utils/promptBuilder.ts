@@ -4,6 +4,7 @@
  */
 
 import type { FormDataState } from '../types';
+import { translateOptionForPrompt } from './promptTranslations';
 
 /**
  * 生成基礎 prompt（用於顯示）
@@ -11,10 +12,18 @@ import type { FormDataState } from '../types';
 export function buildDisplayPrompt(formData: FormDataState): string {
   const genderText = formData.modelGender === '女性模特兒' ? 'female' : 'male';
   
-  let prompt = `A professional fashion photoshoot featuring '${formData.productName}'.
-A ${genderText} model with a ${formData.clothingStyle} aesthetic is wearing clothing suitable for the ${formData.clothingSeason}.
-The setting is ${formData.background}.
-The model has a ${formData.expression} expression and is in a ${formData.pose} pose.`;
+  // 翻譯所有選項為英文（顯示用）
+  const clothingStyleEn = translateOptionForPrompt('clothingStyle', formData.clothingStyle);
+  const clothingSeasonEn = translateOptionForPrompt('clothingSeason', formData.clothingSeason);
+  const backgroundEn = translateOptionForPrompt('background', formData.background);
+  const expressionEn = translateOptionForPrompt('expression', formData.expression);
+  const poseEn = translateOptionForPrompt('pose', formData.pose);
+  const lightingEn = translateOptionForPrompt('lighting', formData.lighting);
+  
+  let prompt = `Professional commercial fashion photography featuring '${formData.productName}'.
+A ${genderText} model styled in ${clothingStyleEn} fashion, appropriate for ${clothingSeasonEn} season.
+Set in ${backgroundEn}, with authentic environmental details and atmosphere.
+The model displays ${expressionEn}, ${poseEn}.`;
 
   if (formData.additionalDescription) {
     prompt += `\nAdditional details: ${formData.additionalDescription}.`;
@@ -28,7 +37,8 @@ The model has a ${formData.expression} expression and is in a ${formData.pose} p
     prompt += `\nCRITICAL: The scene must prominently feature the object from the provided reference image.`;
   }
 
-  prompt += `\nPhotographic style: Lit with ${formData.lighting}. The image should be detailed, ultra-realistic, photorealistic, high resolution (8k), cinematic, with a shallow depth of field and beautiful bokeh.
+  prompt += `\n\nLighting: ${lightingEn}.
+Photographic style: Ultra-realistic, 8K resolution, cinematic composition, shallow depth of field with elegant bokeh.
 The final output will be a set of three distinct, full-frame images from this scene:
 1. A full-body shot.
 2. A medium shot (from the waist up).
@@ -43,20 +53,27 @@ The final output will be a set of three distinct, full-frame images from this sc
 export function buildApiBasePrompt(formData: FormDataState): string {
   const genderText = formData.modelGender === '女性模特兒' ? 'female' : 'male';
   
-  let prompt = `A professional fashion photoshoot featuring '${formData.productName}'.
-A ${genderText} model with a ${formData.clothingStyle} aesthetic is wearing clothing suitable for the ${formData.clothingSeason}.
-The setting is ${formData.background}.
-The model has a ${formData.expression} expression and is in a ${formData.pose} pose.`;
+  // 翻譯所有選項為英文
+  const clothingStyleEn = translateOptionForPrompt('clothingStyle', formData.clothingStyle);
+  const clothingSeasonEn = translateOptionForPrompt('clothingSeason', formData.clothingSeason);
+  const backgroundEn = translateOptionForPrompt('background', formData.background);
+  const expressionEn = translateOptionForPrompt('expression', formData.expression);
+  const poseEn = translateOptionForPrompt('pose', formData.pose);
+  const lightingEn = translateOptionForPrompt('lighting', formData.lighting);
+  
+  // 構建提示詞
+  let prompt = `Professional commercial fashion photography featuring '${formData.productName}'.
+A ${genderText} model styled in ${clothingStyleEn} fashion, appropriate for ${clothingSeasonEn} season.
+Set in ${backgroundEn}, with authentic environmental details and atmosphere.
+The model displays ${expressionEn}, ${poseEn}.`;
 
   if (formData.additionalDescription) {
     prompt += `\nAdditional details: ${formData.additionalDescription}.`;
   }
 
-  prompt += `\nPhotographic style: Lit with ${formData.lighting}. This must be a single, full-frame photograph. The image should be detailed, ultra-realistic, photorealistic, high resolution (8k), cinematic, with a shallow depth of field and beautiful bokeh. Do not create collages, diptychs, triptychs, or any split-screen images.
-The final output will be a set of three distinct, full-frame images from this scene:
-1. A full-body shot.
-2. A medium shot (from the waist up).
-3. A close-up shot (head and shoulders).`;
+  prompt += `\n\nLighting: ${lightingEn}.
+Photographic style: Ultra-realistic, 8K resolution, cinematic composition, shallow depth of field with elegant bokeh. This must be a single, full-frame photograph. Do not create collages, diptychs, triptychs, or any split-screen images.
+The product '${formData.productName}' should be clearly visible and well-presented.`;
 
   return prompt;
 }
@@ -85,12 +102,12 @@ export function addReferenceImageInstructions(
   let result = prompt;
 
   if (hasFaceImage) {
-    result += "\nCRITICAL INSTRUCTION: The model's face must be identical to the face in the first provided image.";
+    result += "\nCRITICAL INSTRUCTION: The model's facial features, proportions, and expression must exactly match the face in the first provided reference image. Maintain facial identity consistency.";
   }
 
   if (hasObjectImage) {
     const imageRefText = hasFaceImage ? "second" : "first";
-    result += `\nCRITICAL INSTRUCTION: The scene must prominently feature the object from the ${imageRefText} provided image.`;
+    result += `\nCRITICAL INSTRUCTION: The object/product in the scene must match the ${imageRefText} provided reference image exactly in design, color, texture, and details.`;
   }
 
   return result;
