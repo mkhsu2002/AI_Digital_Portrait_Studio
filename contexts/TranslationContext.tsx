@@ -414,6 +414,7 @@ interface PromptDisplayTranslations {
   videoUnsupported: string;
   downloadImage: string;
   downloading: string;
+  clickToEnlarge: string;
 }
 
 interface HistoryTranslations {
@@ -513,7 +514,7 @@ const translations: Record<Language, Translations> = {
     "languageName": "繁體中文",
     "toggleLabel": "English",
     header: {
-      "title": "電商人像攝影棚 v3.9",
+      "title": "電商人像攝影棚 v4.0",
       "subtitle": "專為電商產業所設計，一鍵生成專業人像攝影照",
       welcome: (email) => `歡迎，${email}`,
       credits: (remaining, isLoading) =>
@@ -559,6 +560,7 @@ const translations: Record<Language, Translations> = {
       "downloadHint": "💡 提示：在圖片上按右鍵選擇「另存圖片」即可下載",
       "downloadImage": "下載圖片",
       "downloading": "下載中...",
+      "clickToEnlarge": "點擊圖片可放大檢視",
     },
     history: {
       "title": "歷史紀錄",
@@ -628,7 +630,7 @@ const translations: Record<Language, Translations> = {
     "languageName": "English",
     "toggleLabel": "中文",
     header: {
-      "title": "AI Digital Portrait Studio v3.9",
+      "title": "AI Digital Portrait Studio v4.0",
       "subtitle": "Designed for e-commerce—generate professional portrait shots in one click",
       welcome: (email) => `Welcome, ${email}`,
       credits: (remaining, isLoading) =>

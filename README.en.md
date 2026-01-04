@@ -16,7 +16,7 @@ If you want to deploy it yourself, please refer to the GitHub/Cloudflare Pages d
 
 ## 📋 Version Information
 
-### v3.9 (Latest Version)
+### v4.0 (Latest Version)
 
 **Major Changes**:
 - ✅ **Menu Options Optimization**: Optimized options for clothing styles, seasons, backgrounds, expressions, poses, and lighting to better suit commercial photography and portrait photography needs

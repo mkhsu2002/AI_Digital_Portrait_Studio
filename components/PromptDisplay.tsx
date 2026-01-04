@@ -4,6 +4,7 @@ import ClipboardIcon from "./icons/ClipboardIcon";
 import CheckIcon from "./icons/CheckIcon";
 import SpinnerIcon from "./icons/SpinnerIcon";
 import DownloadIcon from "./icons/DownloadIcon";
+import ImageModal from "./ImageModal";
 import { useTranslation } from "../contexts/TranslationContext";
 import { downloadImage } from "../utils/imageUtils";
 
@@ -27,6 +28,7 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
   const { t, translateShotLabel } = useTranslation();
   const [isCopied, setIsCopied] = useState(false);
   const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null);
+  const [modalImage, setModalImage] = useState<{ image: ImageResult; label: string } | null>(null);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(prompt).then(() => {
@@ -165,9 +167,11 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
                     <img
                       src={image.src}
                       alt={`Generated image ${index + 1}`}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                       loading="lazy"
                       decoding="async"
+                      onClick={() => setModalImage({ image, label: shotLabel })}
+                      style={{ touchAction: "manipulation" }}
                     />
                   )}
                 </div>
@@ -199,7 +203,7 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
                       )}
                     </div>
                     <p className="text-xs text-slate-400 text-center">
-                      {t.promptDisplay.downloadHint}
+                      {t.promptDisplay.clickToEnlarge}
                     </p>
                   </div>
                 </div>
@@ -275,6 +279,13 @@ const PromptDisplay: React.FC<PromptDisplayProps> = React.memo(({
           </div>
         </details>
       </div>
+      {modalImage && (
+        <ImageModal
+          image={modalImage.image}
+          shotLabel={modalImage.label}
+          onClose={() => setModalImage(null)}
+        />
+      )}
     </div>
   );
 });
