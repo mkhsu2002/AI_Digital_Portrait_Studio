@@ -203,7 +203,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             throw new Error('Request cancelled');
           }
           return client.models.generateContent({
-            model: "gemini-2.5-flash-image",
+            model: formData.imageModel || "gemini-2.5-flash-image",
             contents: [{
               role: 'user',
               parts,

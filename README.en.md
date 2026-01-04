@@ -1,6 +1,6 @@
 # AI Digital Portrait Studio
 
-**Version: v3.8**
+**Version: v3.9**
 
 AI Digital Portrait Studio is a React + Vite web application that integrates Google Gemini image models with Firebase services to help brands quickly generate multi-angle portrait product images. The project is open source—feel free to deploy and customize according to your needs.
 
@@ -16,7 +16,7 @@ If you want to deploy it yourself, please refer to the GitHub/Cloudflare Pages d
 
 ## 📋 Version Information
 
-### v3.8 (Latest Version)
+### v3.9 (Latest Version)
 
 **Major Changes**:
 - ✅ **Menu Options Optimization**: Optimized options for clothing styles, seasons, backgrounds, expressions, poses, and lighting to better suit commercial photography and portrait photography needs

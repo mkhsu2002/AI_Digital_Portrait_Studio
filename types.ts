@@ -14,6 +14,7 @@ export interface FormDataState {
   pose: string;
   lighting: string;
   aspectRatio: string;
+  imageModel: string;
   faceImage: ReferenceImageData | null;
   objectImage: ReferenceImageData | null;
   additionalDescription: string;
@@ -35,6 +36,7 @@ export interface HistoryFormData {
   pose: string;
   lighting: string;
   aspectRatio: string;
+  imageModel: string;
   additionalDescription: string;
   faceImage: HistoryImageMetadata | null;
   objectImage: HistoryImageMetadata | null;

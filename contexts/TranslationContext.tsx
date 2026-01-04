@@ -12,7 +12,8 @@ type OptionCategory =
   | "expression"
   | "pose"
   | "lighting"
-  | "modelGender";
+  | "modelGender"
+  | "imageModel";
 
 type OptionLabelMap = Record<OptionCategory, Record<string, string>>;
 
@@ -173,6 +174,10 @@ const optionLabels: Record<Language, OptionLabelMap> = {
       "女性模特兒": "女性模特兒",
       "男性模特兒": "男性模特兒",
     },
+    imageModel: {
+      "gemini-2.5-flash-image": "Gemini 2.5 Flash（快速，經濟）",
+      "gemini-3-pro-image-preview": "Gemini 3 Pro（高品質，專業）",
+    },
   },
   en: {
     clothingStyle: {
@@ -329,6 +334,10 @@ const optionLabels: Record<Language, OptionLabelMap> = {
     modelGender: {
       "女性模特兒": "Female model",
       "男性模特兒": "Male model",
+    },
+    imageModel: {
+      "gemini-2.5-flash-image": "Gemini 2.5 Flash (Fast, Economical)",
+      "gemini-3-pro-image-preview": "Gemini 3 Pro (High Quality, Professional)",
     },
   },
 };
@@ -504,7 +513,7 @@ const translations: Record<Language, Translations> = {
     "languageName": "繁體中文",
     "toggleLabel": "English",
     header: {
-      "title": "電商人像攝影棚 v3.8",
+      "title": "電商人像攝影棚 v3.9",
       "subtitle": "專為電商產業所設計，一鍵生成專業人像攝影照",
       welcome: (email) => `歡迎，${email}`,
       credits: (remaining, isLoading) =>
@@ -619,7 +628,7 @@ const translations: Record<Language, Translations> = {
     "languageName": "English",
     "toggleLabel": "中文",
     header: {
-      "title": "AI Digital Portrait Studio v3.8",
+      "title": "AI Digital Portrait Studio v3.9",
       "subtitle": "Designed for e-commerce—generate professional portrait shots in one click",
       welcome: (email) => `Welcome, ${email}`,
       credits: (remaining, isLoading) =>
@@ -645,6 +654,7 @@ const translations: Record<Language, Translations> = {
       "pose": "Pose",
       "lighting": "Lighting",
       "aspectRatio": "Image aspect ratio",
+      "imageModel": "Image Generation Model",
       "selectFile": "Choose file...",
       "generateButton": "Generate images",
       "removeFile": "Remove file",

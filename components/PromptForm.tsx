@@ -11,6 +11,7 @@ import {
   FEMALE_POSES,
   MALE_POSES,
   MODEL_GENDERS,
+  IMAGE_MODELS,
 } from "../constants";
 import InputGroup from "./InputGroup";
 import SpinnerIcon from "./icons/SpinnerIcon";
@@ -270,6 +271,21 @@ const PromptForm: React.FC<PromptFormProps> = React.memo(({
             </select>
           </InputGroup>
         </div>
+
+        <InputGroup label={t.form.imageModel}>
+          <select
+            name="imageModel"
+            value={formData.imageModel}
+            onChange={onFormChange}
+            className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+          >
+            {IMAGE_MODELS.map((model) => (
+              <option key={model} value={model}>
+                {translateOption("imageModel", model)}
+              </option>
+            ))}
+          </select>
+        </InputGroup>
       </div>
       <div className="mt-8">
         <button

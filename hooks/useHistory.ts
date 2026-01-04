@@ -36,6 +36,7 @@ export const useHistory = (): UseHistoryReturn => {
       pose: data.pose,
       lighting: data.lighting,
       aspectRatio: data.aspectRatio,
+      imageModel: data.imageModel,
       additionalDescription: data.additionalDescription,
       faceImage: data.faceImage
         ? {
@@ -66,6 +67,7 @@ export const useHistory = (): UseHistoryReturn => {
       pose: historyData.pose,
       lighting: historyData.lighting,
       aspectRatio: historyData.aspectRatio,
+      imageModel: historyData.imageModel || IMAGE_MODELS[0], // 向後相容
       additionalDescription: historyData.additionalDescription,
       faceImage: null,
       objectImage: null,

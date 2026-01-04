@@ -10,6 +10,7 @@ import {
   MALE_POSES,
   LIGHTING_CONDITIONS,
   ASPECT_RATIOS,
+  IMAGE_MODELS,
 } from '../constants';
 import { validateFile } from '../utils/validation';
 import { smartCompressImage } from '../utils/imageCompression';
@@ -34,6 +35,7 @@ const DEFAULT_FORM_DATA: FormDataState = {
   pose: FEMALE_POSES[0], // 預設女性姿勢
   lighting: LIGHTING_CONDITIONS[0], // 柔和攝影棚光（商業攝影標準）
   aspectRatio: ASPECT_RATIOS[0], // 9:16
+  imageModel: IMAGE_MODELS[0], // gemini-2.5-flash-image (預設)
   faceImage: null,
   objectImage: null,
   additionalDescription: '',
