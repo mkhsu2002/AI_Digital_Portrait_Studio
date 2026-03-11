@@ -18,6 +18,7 @@ import SpinnerIcon from "./icons/SpinnerIcon";
 import RemoveIcon from "./icons/RemoveIcon";
 import BackgroundSelect from "./BackgroundSelect";
 import { useTranslation } from "../contexts/TranslationContext";
+import { useApiKey } from "../contexts/ApiKeyContext";
 import { enhanceDescription } from "../utils/aiEnhancer";
 import { useState } from "react";
 
@@ -106,14 +107,13 @@ const PromptForm: React.FC<PromptFormProps> = React.memo(({
   isLoading,
 }) => {
   const { t, translateOption } = useTranslation();
+  const { getApiKey } = useApiKey();
   const [isEnhancing, setIsEnhancing] = useState(false);
 
   const handleEnhanceDescription = async () => {
-    // 取得環境變數的 API Key
-    // @ts-ignore
-    const apiKey = import.meta.env.VITE_API_KEY;
+    const apiKey = getApiKey();
     if (!apiKey) {
-      alert("Please set VITE_API_KEY in your environment to use this feature.");
+      alert(t.errors.missingApiKey || "Please set your Gemini API Key to use this feature.");
       return;
     }
 
