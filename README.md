@@ -1,6 +1,6 @@
 # AI Digital Portrait Studio
 
-**版本：v4.1**
+**版本：v1.0**
 
 「電商人像攝影棚」是一套基於 React + Vite 的網頁應用，整合 Google Gemini 影像模型與 Firebase 服務，協助品牌快速生成多視角的人像商品圖。專案已開源，歡迎自行部署並依需求調整。
 
@@ -16,15 +16,15 @@
 
 ## 📋 版本資訊
 
-### v4.1（最新版本）
+### v1.0（正式發布版本）
 
 **主要改動**：
-- ✅ **功能選單優化**：優化服裝風格、季節、背景、表情、姿勢、光線等選單選項，更貼近商業攝影與人物寫真需求
-- ✅ **商業攝影選項增強**：新增多項商業攝影常用的風格、姿勢、光線選項
-- ✅ **自然情境光線選項**：保留並優化自然情境光線選項（雪地反射柔光、正午烈陽硬光、雲霧陰雨情境等）
-- ✅ **程式碼組織與模組化**：將業務邏輯拆分為多個自訂 Hooks，提升可維護性
-- ✅ **錯誤處理改善**：建立統一錯誤處理機制，提供更友善的錯誤訊息
-- ✅ **API Key 統一管理**：使用 `ApiKeyContext` 統一管理 API Key，支援環境變數與瀏覽器擴充功能
+- ✅ **全新架構整合**：將原始碼整合至 `src` 目錄，提升開發維護效率
+- ✅ **效能與記憶體優化**：引入 `AbortController` 與 `Blob URL` 釋放機制，大幅減少記憶體佔用
+- ✅ **功能選單優化**：優化服裝風格、背景、表情、姿勢、光線等選單內容
+- ✅ **程式碼模組化**：完成 Context 解耦，提升渲染效能與可擴展性
+- ✅ **自動化測試基礎**：導入 Vitest 框架與單元測試範本
+- ✅ **API Key 統一管理**：使用 `ApiKeyContext` 統一管理 API Key，支援多來源輸入
 
 ## 核心功能
 
@@ -66,9 +66,9 @@
    VITE_FIREBASE_APP_ID=你的_APP_ID
    ```
    
-   **📝 v3.5 更新：API Key 管理方式**
+   **📝 v1.0 更新：API Key 管理方式**
    
-   自 v3.5 版本起，API Key 的取得與管理已統一改為使用 `ApiKeyContext` 管理：
+   API Key 的取得與管理已統一改為使用 `ApiKeyContext` 管理：
    - **優先順序**：環境變數 `VITE_API_KEY` > 瀏覽器擴充功能 `window.aistudio`
    - **優點**：統一管理邏輯，易於測試與擴展
    - **向後相容**：現有功能不受影響，只是內部實作改為使用 Context
@@ -239,7 +239,7 @@
 
 - [CLOUDFLARE_PAGES_SETUP.md](./CLOUDFLARE_PAGES_SETUP.md) - Cloudflare Pages 完整設定指南
 - [SECURITY.md](./SECURITY.md) - 安全部署指南
-- [API_KEY_CONTEXT_REFACTOR.md](./API_KEY_CONTEXT_REFACTOR.md) - API Key 統一管理說明（v3.5）
+- [API_KEY_CONTEXT_REFACTOR.md](./API_KEY_CONTEXT_REFACTOR.md) - API Key 統一管理說明（v1.0）
 
 > ⚠️ **安全提醒**：部署到公開平台時，API Key 會暴露在前端程式碼中。建議使用 Firebase Cloud Functions 作為 API 代理，詳見 [SECURITY.md](./SECURITY.md)。
 

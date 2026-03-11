@@ -560,6 +560,7 @@ interface FormTranslations {
   generating: string;
   back: string;
   quickSelect: string;
+  imageModel: string;
 }
 
 interface PromptDisplayTranslations {
@@ -581,6 +582,7 @@ interface PromptDisplayTranslations {
   downloadImage: string;
   downloading: string;
   clickToEnlarge: string;
+  downloadHint: string;
 }
 
 interface HistoryTranslations {
@@ -680,7 +682,7 @@ const translations: Record<Language, Translations> = {
     "languageName": "繁體中文",
     "toggleLabel": "English",
     header: {
-      "title": "電商人像攝影棚 v4.1",
+      "title": "電商人像攝影棚 v1.0",
       "subtitle": "專為電商產業所設計，一鍵生成專業人像攝影照",
       welcome: (email) => `歡迎，${email}`,
       credits: (remaining, isLoading) =>
@@ -711,6 +713,7 @@ const translations: Record<Language, Translations> = {
       "generating": "正在產生圖片...",
       "back": "返回",
       "quickSelect": "快速選擇",
+      "imageModel": "影像生成模型",
     },
     promptDisplay: {
       "title": "產生結果",
@@ -723,6 +726,11 @@ const translations: Record<Language, Translations> = {
       "togglePrompt": "顯示/隱藏詠唱內容",
       "emptyTitle": "圖片將會顯示在這裡",
       "emptyDescription": "點擊「產生圖片」按鈕開始。",
+      "generateVideo": "生成影片 (Gemini Veo)",
+      "generatingVideo": "正在生成影片...",
+      "downloadImageLabel": (label) => `下載${label}圖片`,
+      "downloadVideoLabel": (label) => `下載${label}影片`,
+      "videoUnsupported": "此比例不支援影片生成",
       "downloadHint": "💡 提示：在圖片上按右鍵選擇「另存圖片」即可下載",
       "downloadImage": "下載圖片",
       "downloading": "下載中...",
@@ -796,7 +804,7 @@ const translations: Record<Language, Translations> = {
     "languageName": "English",
     "toggleLabel": "中文",
     header: {
-      "title": "AI Digital Portrait Studio v4.1",
+      "title": "AI Digital Portrait Studio v1.0",
       "subtitle": "Designed for e-commerce—generate professional portrait shots in one click",
       welcome: (email) => `Welcome, ${email}`,
       credits: (remaining, isLoading) =>
@@ -841,9 +849,15 @@ const translations: Record<Language, Translations> = {
       "togglePrompt": "Show / hide prompt",
       "emptyTitle": "Images will appear here",
       "emptyDescription": "Click \"Generate images\" to get started.",
+      "generateVideo": "Generate Video (Gemini Veo)",
+      "generatingVideo": "Generating video...",
+      "downloadImageLabel": (label) => `Download ${label} image`,
+      "downloadVideoLabel": (label) => `Download ${label} video`,
+      "videoUnsupported": "Video generation not supported for this aspect ratio",
       "downloadHint": "💡 Tip: Right-click on the image and select \"Save image as\" to download",
       "downloadImage": "Download image",
       "downloading": "Downloading...",
+      "clickToEnlarge": "Click image to enlarge",
     },
     history: {
       "title": "History",

@@ -4,7 +4,7 @@ import { useTranslation } from '../contexts/TranslationContext';
 import ApiKeyInput from './ApiKeyInput';
 
 interface HeaderProps {
-  // v3.5: 已移除使用額度限制，不再需要顯示剩餘額度
+  // v1.0: 已移除使用額度限制，不再需要顯示剩餘額度
 }
 
 const Header: React.FC<HeaderProps> = () => {

@@ -110,11 +110,15 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    // v3.5: 已移除使用額度限制，使用者可使用自己的 API Key 無限制生成
+    // v1.0: 已移除使用額度限制，使用者可使用自己的 API Key 無限制生成
 
     try {
       // 生成圖片（保留在本地，Data URL 格式）
       const generatedImages = await imageGeneration.generateImages(formData);
+
+      if (!generatedImages || generatedImages.length === 0) {
+        return;
+      }
 
       // 顯示生成的圖片（本地 Data URL）
       imageGeneration.setImages(generatedImages);

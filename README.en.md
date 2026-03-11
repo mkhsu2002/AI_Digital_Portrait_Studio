@@ -1,6 +1,6 @@
 # AI Digital Portrait Studio
 
-**Version: v4.1**
+**Version: v1.0**
 
 AI Digital Portrait Studio is a React + Vite web application that integrates Google Gemini image models with Firebase services to help brands quickly generate multi-angle portrait product images. The project is open source—feel free to deploy and customize according to your needs.
 
@@ -16,15 +16,15 @@ If you want to deploy it yourself, please refer to the GitHub/Cloudflare Pages d
 
 ## 📋 Version Information
 
-### v4.1 (Latest Version)
+### v1.0 (Official Release)
 
 **Major Changes**:
-- ✅ **Menu Options Optimization**: Optimized options for clothing styles, seasons, backgrounds, expressions, poses, and lighting to better suit commercial photography and portrait photography needs
-- ✅ **Commercial Photography Options Enhanced**: Added multiple options commonly used in commercial photography for styles, poses, and lighting
-- ✅ **Natural Scene Lighting Options**: Preserved and optimized natural scene lighting options (snow-reflected soft light, harsh midday sunlight, cloudy misty rainy atmosphere, etc.)
-- ✅ **Code Organization & Modularization**: Split business logic into multiple custom Hooks for better maintainability
-- ✅ **Error Handling Improvements**: Established unified error handling mechanism with user-friendly error messages
-- ✅ **API Key Unified Management**: Use `ApiKeyContext` to centrally manage API Keys, supporting environment variables and browser extensions
+- ✅ **New Architecture Integration**: Moved source code to `src` directory for better development efficiency
+- ✅ **Performance & Memory Optimization**: Implemented `AbortController` and `Blob URL` cleanup to significantly reduce memory footprint
+- ✅ **Menu Options Optimization**: Optimized options for clothing styles, backgrounds, expressions, poses, and lighting
+- ✅ **Code Modularization**: Completed Context decoupling for improved rendering performance and scalability
+- ✅ **Automated Testing Foundation**: Introduced Vitest framework and unit test templates
+- ✅ **API Key Unified Management**: Use `ApiKeyContext` to centrally manage API Keys, supporting multiple input sources
 
 ## Core Features
 
@@ -66,9 +66,9 @@ If you want to deploy it yourself, please refer to the GitHub/Cloudflare Pages d
    VITE_FIREBASE_APP_ID=YOUR_APP_ID
    ```
    
-   **📝 v3.5 Update: API Key Management**
+   **📝 v1.0 Update: API Key Management**
    
-   Starting from v3.5, API Key acquisition and management have been unified using `ApiKeyContext`:
+   API Key acquisition and management have been unified using `ApiKeyContext`:
    - **Priority**: Environment variable `VITE_API_KEY` > Browser extension `window.aistudio`
    - **Benefits**: Unified management logic, easy to test and extend
    - **Backward Compatible**: Existing functionality is unaffected, only internal implementation uses Context
@@ -417,10 +417,8 @@ For detailed setup, please refer to <a href="https://firebase.google.com/docs/we
 - [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) - Complete deployment guide
 - [QUICK_START_DEPLOYMENT.md](./QUICK_START_DEPLOYMENT.md) - Quick start guide
 - [SECURITY.md](./SECURITY.md) - Security deployment guide
-- [API_KEY_CONTEXT_REFACTOR.md](./API_KEY_CONTEXT_REFACTOR.md) - API Key unified management explanation (v3.5)
+- [API_KEY_CONTEXT_REFACTOR.md](./API_KEY_CONTEXT_REFACTOR.md) - API Key unified management explanation (v1.0)
 - [cloudflare-pages-setup.md](./cloudflare-pages-setup.md) - Cloudflare Pages detailed setup guide
-- [CHANGELOG_v3.5.md](./CHANGELOG_v3.5.md) - v3.5 version changes summary
-- [MERGE_SUMMARY_v3.5.md](./MERGE_SUMMARY_v3.5.md) - v3.5 merge summary
 
 > ⚠️ **Security Reminder**: When deploying to public platforms, API Keys will be exposed in frontend code. It's recommended to use Firebase Cloud Functions as an API proxy. For details, see [SECURITY.md](./SECURITY.md).
 

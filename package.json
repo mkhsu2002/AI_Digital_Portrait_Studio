@@ -1,7 +1,7 @@
 {
-  "name": "電商人像攝影棚-v4.1",
+  "name": "ai-digital-portrait-studio-v1.0",
   "private": true,
-  "version": "4.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
