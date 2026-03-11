@@ -553,6 +553,8 @@ interface FormTranslations {
   background: string;
   additionalDescription: string;
   additionalPlaceholder: string;
+  enhanceDescription: string;
+  enhancing: string;
   modelGender: string;
   expression: string;
   pose: string;
@@ -689,7 +691,7 @@ const translations: Record<Language, Translations> = {
     "languageName": "繁體中文",
     "toggleLabel": "English",
     header: {
-      "title": "電商人像攝影棚 v1.1",
+      "title": "電商人像攝影棚 v1.2",
       "subtitle": "專為電商產業所設計，一鍵生成專業人像攝影照",
       welcome: (email) => `歡迎，${email}`,
       credits: (remaining, isLoading) =>
@@ -712,6 +714,8 @@ const translations: Record<Language, Translations> = {
       "background": "背景環境描述",
       "additionalDescription": "補充描述 (可選)",
       "additionalPlaceholder": "例如：模特兒有著藍色眼睛和金色長髮、背景中有一隻黑色的貓",
+      "enhanceDescription": "✨ AI 隨機生成/擴寫",
+      "enhancing": "產生中...",
       "modelGender": "模特兒性別",
       "expression": "表情描述",
       "pose": "人物姿勢",
@@ -839,6 +843,8 @@ const translations: Record<Language, Translations> = {
       "additionalDescription": "Additional details (optional)",
       "additionalPlaceholder":
         "Example: the model has blue eyes and long blonde hair; a black cat appears in the background.",
+      "enhanceDescription": "✨ AI Generate/Enhance",
+      "enhancing": "Generating...",
       "modelGender": "Model gender",
       "expression": "Facial expression",
       "pose": "Pose",

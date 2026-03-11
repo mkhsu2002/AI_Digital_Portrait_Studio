@@ -18,6 +18,8 @@ import SpinnerIcon from "./icons/SpinnerIcon";
 import RemoveIcon from "./icons/RemoveIcon";
 import BackgroundSelect from "./BackgroundSelect";
 import { useTranslation } from "../contexts/TranslationContext";
+import { enhanceDescription } from "../utils/aiEnhancer";
+import { useState } from "react";
 
 interface PromptFormProps {
   formData: FormDataState;
@@ -104,6 +106,41 @@ const PromptForm: React.FC<PromptFormProps> = React.memo(({
   isLoading,
 }) => {
   const { t, translateOption } = useTranslation();
+  const [isEnhancing, setIsEnhancing] = useState(false);
+
+  const handleEnhanceDescription = async () => {
+    // 取得環境變數的 API Key
+    // @ts-ignore
+    const apiKey = import.meta.env.VITE_API_KEY;
+    if (!apiKey) {
+      alert("Please set VITE_API_KEY in your environment to use this feature.");
+      return;
+    }
+
+    setIsEnhancing(true);
+    try {
+      const response = await enhanceDescription(
+        formData.additionalDescription,
+        formData,
+        apiKey
+      );
+
+      if (response.success && response.content) {
+        // 更新表單資料
+        const syntheticEvent = {
+          target: { name: 'additionalDescription', value: response.content },
+        } as React.ChangeEvent<HTMLTextAreaElement>;
+        onFormChange(syntheticEvent);
+      } else {
+        alert(response.error || "Failed to generate description.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("An unexpected error occurred.");
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
 
   return (
     <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
@@ -212,7 +249,20 @@ const PromptForm: React.FC<PromptFormProps> = React.memo(({
           />
         </InputGroup>
 
-        <InputGroup label={t.form.additionalDescription}>
+        <InputGroup label={
+          <div className="flex items-center justify-between w-full">
+            <span>{t.form.additionalDescription}</span>
+            <button
+              type="button"
+              onClick={handleEnhanceDescription}
+              disabled={isEnhancing || isLoading}
+              className="text-xs font-semibold px-2 py-1 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white rounded shadow transition-all disabled:opacity-50 flex flex-row items-center gap-1"
+            >
+              {isEnhancing && <SpinnerIcon className="w-3 h-3 animate-spin"/>}
+              {isEnhancing ? t.form.enhancing : t.form.enhanceDescription}
+            </button>
+          </div>
+        }>
           <textarea
             name="additionalDescription"
             value={formData.additionalDescription}
