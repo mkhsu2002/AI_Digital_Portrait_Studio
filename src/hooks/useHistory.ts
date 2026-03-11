@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import type { HistoryItem, HistoryFormData, FormDataState } from '../types';
 import { useApi } from '../contexts/ApiContext';
 import { useAuth } from '../contexts/AuthContext';
+import { IMAGE_MODELS } from '../constants';
+import { fetchUserHistory, addHistoryRecord, deleteHistoryRecord as deleteHistoryRecordService } from '../services/historyService';
 import { handleError, logError } from '../utils/errorHandler';
 
 interface UseHistoryReturn {
@@ -86,7 +88,7 @@ export const useHistory = (): UseHistoryReturn => {
     setError(null);
 
     try {
-      const records = await api.loadUserHistory(user.uid);
+      const records = await fetchUserHistory(user.uid);
       setHistory(records);
     } catch (err) {
       const appError = handleError(err, '載入歷史紀錄失敗');
@@ -125,7 +127,7 @@ export const useHistory = (): UseHistoryReturn => {
           return newHistory;
         });
 
-        await api.saveHistoryRecord(user.uid, historySnapshot);
+        await addHistoryRecord(user.uid, historySnapshot);
       } catch (err) {
         const appError = handleError(err, '儲存歷史紀錄失敗');
         logError(appError, 'Save History');
@@ -141,7 +143,7 @@ export const useHistory = (): UseHistoryReturn => {
       if (!user) return;
 
       try {
-        await api.deleteHistoryRecord(user.uid, recordId);
+        await deleteHistoryRecordService(user.uid, recordId);
         setHistory((prevHistory) => prevHistory.filter((item) => item.id !== recordId));
       } catch (err) {
         const appError = handleError(err, '刪除歷史紀錄失敗');
@@ -154,7 +156,9 @@ export const useHistory = (): UseHistoryReturn => {
 
   useEffect(() => {
     loadHistory();
-  }, [loadHistory]);
+    // 移除 [loadHistory] 依賴，避免無限循環（這點在優化報告中被提及）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   return {
     history,

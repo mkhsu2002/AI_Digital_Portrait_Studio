@@ -1,11 +1,12 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { FormDataState, ImageResult } from '../types';
 import { useApi } from '../contexts/ApiContext';
 import { useTranslation } from '../contexts/TranslationContext';
 import { handleError, logError, ErrorType } from '../utils/errorHandler';
 
 interface UseImageGenerationReturn {
-  generateImages: (formData: FormDataState) => Promise<ImageResult[]>;
+  generateImages: (formData: FormDataState) => Promise<ImageResult[] | void>;
+  cancel: () => void;
   isLoading: boolean;
   error: string | null;
   images: ImageResult[];
@@ -22,9 +23,16 @@ export const useImageGeneration = (): UseImageGenerationReturn => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [images, setImages] = useState<ImageResult[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const generateImages = useCallback(
-    async (formData: FormDataState): Promise<ImageResult[]> => {
+    async (formData: FormDataState): Promise<ImageResult[] | void> => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
       setIsLoading(true);
       setError(null);
       setImages([]);
@@ -36,25 +44,46 @@ export const useImageGeneration = (): UseImageGenerationReturn => {
           closeUp: translateShotLabel('closeUp'),
         };
 
-        const generatedImages = await api.generateImages(formData, shotLabels);
+        const generatedImages = await api.generateImages(formData, shotLabels, abortController.signal);
         setImages(generatedImages);
         return generatedImages;
-      } catch (err) {
+      } catch (err: any) {
+        if (err.name === 'AbortError' || err.message === 'Request cancelled') {
+          return;
+        }
         const appError = handleError(err);
         logError(appError, 'Image Generation');
-        // 使用更具體的錯誤訊息，如果沒有則使用通用訊息
         const errorMessage = appError.userMessage || appError.message || t.errors.general;
         setError(errorMessage);
         throw err;
       } finally {
-        setIsLoading(false);
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     },
     [api, translateShotLabel, t]
   );
 
+  const cancel = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      images.forEach(img => {
+        if (img.blobUrl) {
+          URL.revokeObjectURL(img.blobUrl);
+        }
+      });
+    };
+  }, [images]);
+
   return {
     generateImages,
+    cancel,
     isLoading,
     error,
     images,

@@ -1,30 +1,21 @@
 import React, { createContext, useContext, useMemo, useCallback } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
-import type { FormDataState, ImageResult, HistoryItem, ShotLabelKey } from '../types';
+import type { FormDataState, ImageResult, ShotLabelKey } from '../types';
 import type { GeminiResponse, GeminiCandidate, GeminiImagePart, VeoOperation } from '../types/api';
-import { addHistoryRecord, fetchUserHistory, deleteHistoryRecord as deleteHistoryRecordService } from '../services/historyService';
 import { storage } from "../firebase";
 import { ref, uploadString, getDownloadURL } from "firebase/storage";
-import { fetchGenerationQuota, consumeGenerationCredit } from '../services/usageService';
 import { retry, isRetryableError } from '../utils/retry';
-import { blobToBase64, resolveImageBytes, createThumbnail } from '../utils/imageUtils';
+import { blobToBase64, resolveImageBytes, createThumbnail, base64ToBlob } from '../utils/imageUtils';
 import { buildApiBasePrompt, addShotInstruction, addReferenceImageInstructions } from '../utils/promptBuilder';
 import { useApiKey } from './ApiKeyContext';
 
 interface ApiContextValue {
   // Gemini API 相關
-  generateImages: (formData: FormDataState, shotLabels: Record<ShotLabelKey, string>) => Promise<ImageResult[]>;
+  generateImages: (formData: FormDataState, shotLabels: Record<ShotLabelKey, string>, signal?: AbortSignal) => Promise<ImageResult[]>;
   generateVideo: (imageSrc: string, aspectRatio: string) => Promise<string>;
   
   // Firebase Storage 相關（只上傳縮圖）
   uploadHistoryThumbnails: (uid: string, images: ImageResult[]) => Promise<string[]>;
-  
-  // Firestore 相關
-  loadUserHistory: (uid: string) => Promise<HistoryItem[]>;
-  saveHistoryRecord: (uid: string, item: HistoryItem) => Promise<void>;
-  deleteHistoryRecord: (uid: string, recordId: string) => Promise<void>;
-  loadGenerationQuota: (uid: string) => Promise<{ generationCredits: number }>;
-  consumeCredit: (uid: string) => Promise<number>;
   
   // 工具函數
   downloadResource: (url: string) => Promise<Blob>;
@@ -317,14 +308,20 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error("Insufficient images generated");
     }
 
-    return generatedImagesRaw.map(({ label, labelKey, mimeType, base64 }) => ({
-      src: `data:${mimeType};base64,${base64}`,
-      label,
-      labelKey,
-      videoSrc: null,
-      isGeneratingVideo: false,
-      videoError: null,
-    }));
+    return generatedImagesRaw.map(({ label, labelKey, mimeType, base64 }) => {
+      const blob = base64ToBlob(base64, mimeType);
+      const blobUrl = URL.createObjectURL(blob);
+      return {
+        src: blobUrl,
+        blobUrl: blobUrl,
+        base64: base64,
+        label,
+        labelKey,
+        videoSrc: null,
+        isGeneratingVideo: false,
+        videoError: null,
+      };
+    });
   }, [getGeminiClient, extractCandidates, apiKeyContext]);
   
   // 生成影片（支援取消）
@@ -442,8 +439,8 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const timestamp = Date.now();
     const thumbnailUrls = await Promise.all(
       images.map(async (image, index) => {
-        if (!image.src.startsWith("data:")) {
-          // 如果已經是 URL，直接返回（不應該發生）
+        if (!image.src.startsWith("data:") && !image.src.startsWith("blob:")) {
+          // 如果是其他 URL（例如歷史紀錄的外部連結）
           return image.src;
         }
 
@@ -463,37 +460,13 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return thumbnailUrls;
   }, []);
   
-  // Firestore 相關方法（直接使用現有服務）
-  const loadUserHistory = useCallback(async (uid: string): Promise<HistoryItem[]> => {
-    return fetchUserHistory(uid);
-  }, []);
-  
-  const saveHistoryRecord = useCallback(async (uid: string, item: HistoryItem): Promise<void> => {
-    return addHistoryRecord(uid, item);
-  }, []);
-  
-  const deleteHistoryRecord = useCallback(async (uid: string, recordId: string): Promise<void> => {
-    return deleteHistoryRecordService(uid, recordId);
-  }, []);
-  
-  const loadGenerationQuota = useCallback(async (uid: string): Promise<{ generationCredits: number }> => {
-    return fetchGenerationQuota(uid);
-  }, []);
-  
-  const consumeCredit = useCallback(async (uid: string): Promise<number> => {
-    return consumeGenerationCredit(uid);
-  }, []);
+  // Firestore 相關方法已解耦到各自的 Hooks 與 Services 中
   
   const value = useMemo<ApiContextValue>(
     () => ({
       generateImages,
       generateVideo,
       uploadHistoryThumbnails,
-      loadUserHistory,
-      saveHistoryRecord,
-      deleteHistoryRecord,
-      loadGenerationQuota,
-      consumeCredit,
       downloadResource,
       checkApiKeyAvailable,
     }),
@@ -501,11 +474,6 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       generateImages,
       generateVideo,
       uploadHistoryThumbnails,
-      loadUserHistory,
-      saveHistoryRecord,
-      deleteHistoryRecord,
-      loadGenerationQuota,
-      consumeCredit,
       downloadResource,
       checkApiKeyAvailable,
     ]

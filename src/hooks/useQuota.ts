@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useApi } from '../contexts/ApiContext';
+import { fetchGenerationQuota, consumeGenerationCredit } from '../services/usageService';
 import { useAuth } from '../contexts/AuthContext';
 import { handleError, logError, ErrorType } from '../utils/errorHandler';
 
@@ -15,7 +15,6 @@ interface UseQuotaReturn {
  * Hook for managing generation quota
  */
 export const useQuota = (): UseQuotaReturn => {
-  const api = useApi();
   const { user } = useAuth();
   const [remainingCredits, setRemainingCredits] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,7 +31,7 @@ export const useQuota = (): UseQuotaReturn => {
     setError(null);
 
     try {
-      const usage = await api.loadGenerationQuota(user.uid);
+      const usage = await fetchGenerationQuota(user.uid);
       setRemainingCredits(usage.generationCredits);
     } catch (quotaError) {
       const appError = handleError(quotaError, '載入使用次數失敗');
@@ -41,13 +40,13 @@ export const useQuota = (): UseQuotaReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, api]);
+  }, [user]);
 
   const consumeCredit = useCallback(async (): Promise<number | null> => {
     if (!user) return null;
 
     try {
-      const creditsAfterConsume = await api.consumeCredit(user.uid);
+      const creditsAfterConsume = await consumeGenerationCredit(user.uid);
       setRemainingCredits(creditsAfterConsume);
       return creditsAfterConsume;
     } catch (consumeError) {
@@ -61,7 +60,7 @@ export const useQuota = (): UseQuotaReturn => {
       
       throw appError;
     }
-  }, [user, api]);
+  }, [user]);
 
   useEffect(() => {
     loadQuota();

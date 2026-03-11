@@ -46,6 +46,8 @@ export type ShotLabelKey = "fullBody" | "medium" | "closeUp";
 
 export interface ImageResult {
   src: string;
+  blobUrl?: string;
+  base64?: string;
   label: string;
   labelKey?: ShotLabelKey;
   videoSrc: string | null;
