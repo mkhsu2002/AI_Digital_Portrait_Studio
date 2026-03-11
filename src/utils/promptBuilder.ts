@@ -3,7 +3,7 @@
  * 統一管理所有 prompt 生成邏輯
  */
 
-import type { FormDataState } from '../types';
+import { FormDataState, ShotLabelKey } from '../types';
 import { translateOptionForPrompt } from './promptTranslations';
 
 /**
@@ -35,6 +35,18 @@ The model displays ${expressionEn}, ${poseEn}.`;
 
   if (formData.objectImage) {
     prompt += `\nCRITICAL: The scene must prominently feature the object from the provided reference image.`;
+  }
+
+  if (formData.poseImage && formData.pose === '參考人物姿勢參考圖') {
+    prompt += `\nCRITICAL: The model's pose must exactly match the posture in the provided pose reference image.`;
+  }
+
+  if (formData.expressionImage && formData.expression === '參考人物表情參考圖') {
+    prompt += `\nCRITICAL: The model's facial expression must exactly match the expression in the provided expression reference image.`;
+  }
+
+  if (formData.angleImage) {
+    prompt += `\nCRITICAL: When generating the 'special angle' shot, the camera viewpoint and perspective must match the provided angle reference image.`;
   }
 
   prompt += `\n\nLighting: ${lightingEn}.
@@ -81,11 +93,12 @@ The product '${formData.productName}' should be clearly visible and well-present
 /**
  * 為特定視角添加指令
  */
-export function addShotInstruction(basePrompt: string, shotType: 'fullBody' | 'medium' | 'closeUp'): string {
+export function addShotInstruction(basePrompt: string, shotType: ShotLabelKey): string {
   const instructions = {
     fullBody: 'CRITICAL: The photograph MUST be a full-body shot, showing the model from head to toe.',
     medium: 'CRITICAL: The photograph MUST be a medium shot, capturing the model from the waist up.',
     closeUp: 'CRITICAL: The photograph MUST be a close-up shot, focusing on the model\'s head and shoulders.',
+    specialAngle: 'CRITICAL: The photograph MUST be a shot using the unique camera angle and perspective from the provided angle reference image.',
   };
 
   return `${basePrompt}\n${instructions[shotType]}`;
@@ -96,21 +109,42 @@ export function addShotInstruction(basePrompt: string, shotType: 'fullBody' | 'm
  */
 export function addReferenceImageInstructions(
   prompt: string,
-  hasFaceImage: boolean,
-  hasObjectImage: boolean
+  formData: FormDataState
 ): string {
   let result = prompt;
+  let imageIndex = 1;
 
-  if (hasFaceImage) {
-    result += "\nCRITICAL INSTRUCTION: The model's facial features, proportions, and expression must exactly match the face in the first provided reference image. Maintain facial identity consistency.";
+  if (formData.faceImage) {
+    result += `\nCRITICAL INSTRUCTION: The model's facial features, proportions, and identity must exactly match the face in the ${ordinal(imageIndex)} provided reference image.`;
+    imageIndex++;
   }
 
-  if (hasObjectImage) {
-    const imageRefText = hasFaceImage ? "second" : "first";
-    result += `\nCRITICAL INSTRUCTION: The object/product in the scene must match the ${imageRefText} provided reference image exactly in design, color, texture, and details.`;
+  if (formData.objectImage) {
+    result += `\nCRITICAL INSTRUCTION: The object/product in the scene must match the ${ordinal(imageIndex)} provided reference image exactly in design, color, and details.`;
+    imageIndex++;
+  }
+
+  if (formData.poseImage && formData.pose === '參考人物姿勢參考圖') {
+    result += `\nCRITICAL INSTRUCTION: The model's body posture and positioning must exactly match the ${ordinal(imageIndex)} provided reference image.`;
+    imageIndex++;
+  }
+
+  if (formData.expressionImage && formData.expression === '參考人物表情參考圖') {
+    result += `\nCRITICAL INSTRUCTION: The model's facial expression must match the ${ordinal(imageIndex)} provided reference image precisely.`;
+    imageIndex++;
+  }
+
+  if (formData.angleImage) {
+    result += `\nCRITICAL INSTRUCTION: For the special angle shot, mimic the camera height, tilt, and field of view from the ${ordinal(imageIndex)} provided reference image.`;
+    imageIndex++;
   }
 
   return result;
+}
+
+function ordinal(n: number): string {
+  const s = ["first", "second", "third", "fourth", "fifth"];
+  return s[n - 1] || `${n}th`;
 }
 
 

@@ -17,6 +17,9 @@ export interface FormDataState {
   imageModel: string;
   faceImage: ReferenceImageData | null;
   objectImage: ReferenceImageData | null;
+  poseImage: ReferenceImageData | null;
+  expressionImage: ReferenceImageData | null;
+  angleImage: ReferenceImageData | null;
   additionalDescription: string;
 }
 
@@ -40,9 +43,12 @@ export interface HistoryFormData {
   additionalDescription: string;
   faceImage: HistoryImageMetadata | null;
   objectImage: HistoryImageMetadata | null;
+  poseImage: HistoryImageMetadata | null;
+  expressionImage: HistoryImageMetadata | null;
+  angleImage: HistoryImageMetadata | null;
 }
 
-export type ShotLabelKey = "fullBody" | "medium" | "closeUp";
+export type ShotLabelKey = "fullBody" | "medium" | "closeUp" | "specialAngle";
 
 export interface ImageResult {
   src: string;

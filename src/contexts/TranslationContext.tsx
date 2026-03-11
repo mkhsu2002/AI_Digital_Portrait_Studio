@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useState } from "react";
 
 import type { ReactNode } from "react";
 import type { ShotLabelKey } from "../types";
@@ -204,6 +204,7 @@ const optionLabels: Record<Language, OptionLabelMap> = {
       "神情放鬆，視線看向側前方遠處": "神情放鬆，視線看向側前方遠處",
       "冷峻疏離，視線看向側前方遠處": "冷峻疏離，視線看向側前方遠處",
       "慵懶隨興，視線看向斜下方": "慵懶隨興，視線看向斜下方",
+      "參考人物表情參考圖": "參考人物表情參考圖",
       "自行補充描述": "自行補充描述",
     },
     pose: {
@@ -233,8 +234,9 @@ const optionLabels: Record<Language, OptionLabelMap> = {
       "模擬行走動態，步伐自然，身體微側": "模擬行走動態，步伐自然，身體微側",
       "斜靠牆面或支撐物，重心偏移": "斜靠牆面或支撐物，重心偏移",
       "背對鏡頭站立或坐姿，扭轉上身呈現背部與側面": "背對鏡頭站立或坐姿，扭轉上身呈現背部與側面",
-      "正在使用商品（如調整、穿戴、揹起）": "正在使用商品（如調整、穿戴、揹起）",
+      "展示商品細節（如調整、穿戴、揹起）": "正在使用商品（如調整、穿戴、揹起）",
       "展示商品細節（如拉開、整理、指示）": "展示商品細節（如拉開、整理、指示）",
+      "參考人物姿勢參考圖": "參考人物姿勢參考圖",
       "自行補充描述": "自行補充描述",
     },
     lighting: {
@@ -445,6 +447,7 @@ const optionLabels: Record<Language, OptionLabelMap> = {
       "神情放鬆，視線看向側前方遠處": "Relaxed expression, looking into distance ahead",
       "冷峻疏離，視線看向側前方遠處": "Cool and aloof, looking into distance ahead",
       "慵懶隨興，視線看向斜下方": "Lazy casual, looking down at an angle",
+      "參考人物表情參考圖": "Refer to facial expression reference image",
       "自行補充描述": "Custom description",
     },
     pose: {
@@ -476,6 +479,7 @@ const optionLabels: Record<Language, OptionLabelMap> = {
       "背對鏡頭自然站立，呈現背影與服裝背面": "Standing with back to camera, showing back and back of outfit",
       "正在使用商品（如調整、穿戴、揹起）": "Using the product (e.g., adjusting, wearing, carrying)",
       "展示商品細節（如拉開、整理、指示）": "Highlighting product details (e.g., opening, arranging, pointing)",
+      "參考人物姿勢參考圖": "Refer to human pose reference image",
       "自行補充描述": "Custom description",
     },
     lighting: {
@@ -554,6 +558,9 @@ interface FormTranslations {
   pose: string;
   lighting: string;
   aspectRatio: string;
+  poseImage: string;
+  expressionImage: string;
+  angleImage: string;
   selectFile: string;
   generateButton: string;
   removeFile: string;
@@ -682,7 +689,7 @@ const translations: Record<Language, Translations> = {
     "languageName": "繁體中文",
     "toggleLabel": "English",
     header: {
-      "title": "電商人像攝影棚 v1.0",
+      "title": "電商人像攝影棚 v1.1",
       "subtitle": "專為電商產業所設計，一鍵生成專業人像攝影照",
       welcome: (email) => `歡迎，${email}`,
       credits: (remaining, isLoading) =>
@@ -697,8 +704,11 @@ const translations: Record<Language, Translations> = {
       "productName": "品牌商品名稱",
       "clothingStyle": "服裝風格",
       "clothingSeason": "服裝季節",
-      "faceImage": "特定人物臉孔 (可選)",
-      "objectImage": "特定物品 (可選)",
+      "faceImage": "特定人物臉孔參考圖",
+      "objectImage": "特定物品參考圖",
+      "poseImage": "人物姿勢參考圖",
+      "expressionImage": "人物表情參考圖",
+      "angleImage": "攝影視角參考圖",
       "background": "背景環境描述",
       "additionalDescription": "補充描述 (可選)",
       "additionalPlaceholder": "例如：模特兒有著藍色眼睛和金色長髮、背景中有一隻黑色的貓",
@@ -795,6 +805,7 @@ const translations: Record<Language, Translations> = {
       "fullBody": "全身",
       "medium": "半身",
       "closeUp": "特寫",
+      "specialAngle": "特殊視角",
     },
     general: {
       "initializing": "初始化中...",
@@ -819,8 +830,11 @@ const translations: Record<Language, Translations> = {
       "productName": "Product name",
       "clothingStyle": "Clothing style",
       "clothingSeason": "Season / climate",
-      "faceImage": "Reference face (optional)",
-      "objectImage": "Reference object (optional)",
+      "faceImage": "Face reference",
+      "objectImage": "Object reference",
+      "poseImage": "Pose reference",
+      "expressionImage": "Expression reference",
+      "angleImage": "Angle reference",
       "background": "Background description",
       "additionalDescription": "Additional details (optional)",
       "additionalPlaceholder":
@@ -917,9 +931,10 @@ const translations: Record<Language, Translations> = {
       "auth/generic": "The request failed. Please try again later.",
     },
     shotLabels: {
-      "fullBody": "Full body",
-      "medium": "Medium shot",
+      "fullBody": "Full Body",
+      "medium": "Medium Shot",
       "closeUp": "Close-up",
+      "specialAngle": "Special Angle",
     },
     general: {
       "initializing": "Initializing...",
@@ -964,11 +979,10 @@ export const TranslationProvider: React.FC<{ children: ReactNode }> = ({ childre
   return <TranslationContext.Provider value={value}>{children}</TranslationContext.Provider>;
 };
 
-export const useTranslation = (): TranslationContextValue => {
+export const useTranslation = () => {
   const context = useContext(TranslationContext);
-  if (!context) {
-    throw new Error("useTranslation 必須在 TranslationProvider 內使用");
+  if (context === undefined) {
+    throw new Error("useTranslation must be used within a TranslationProvider");
   }
   return context;
 };
-

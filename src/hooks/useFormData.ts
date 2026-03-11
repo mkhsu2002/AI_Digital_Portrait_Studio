@@ -21,7 +21,7 @@ interface UseFormDataReturn {
   setFormData: React.Dispatch<React.SetStateAction<FormDataState>>;
   handleFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
-  handleFileRemove: (name: 'faceImage' | 'objectImage') => void;
+  handleFileRemove: (name: 'faceImage' | 'objectImage' | 'poseImage' | 'expressionImage' | 'angleImage') => void;
   resetFormData: () => void;
 }
 
@@ -38,6 +38,9 @@ const DEFAULT_FORM_DATA: FormDataState = {
   imageModel: IMAGE_MODELS[0], // gemini-2.5-flash-image (預設)
   faceImage: null,
   objectImage: null,
+  poseImage: null,
+  expressionImage: null,
+  angleImage: null,
   additionalDescription: '',
 };
 
@@ -95,14 +98,25 @@ export const useFormData = (initialData?: Partial<FormDataState>): UseFormDataRe
         reader.readAsDataURL(compressedBlob);
       });
 
-      setFormData((prev) => ({
-        ...prev,
-        [name]: {
-          data: base64String,
-          mimeType: compressedBlob.type || file.type,
-          name: file.name,
-        } as ReferenceImageData,
-      }));
+      setFormData((prev) => {
+        const next = {
+          ...prev,
+          [name]: {
+            data: base64String,
+            mimeType: compressedBlob.type || file.type,
+            name: file.name,
+          } as ReferenceImageData,
+        };
+
+        // v1.1: 如果上傳的是姿勢圖或表情圖，自動切換對應的選單選項
+        if (name === 'poseImage') {
+          next.pose = '參考人物姿勢參考圖';
+        } else if (name === 'expressionImage') {
+          next.expression = '參考人物表情參考圖';
+        }
+
+        return next;
+      });
     } catch (error) {
       const appError = handleError(error, '檔案處理失敗');
       logError(appError, 'File Processing');
@@ -111,7 +125,7 @@ export const useFormData = (initialData?: Partial<FormDataState>): UseFormDataRe
     }
   }, []);
 
-  const handleFileRemove = useCallback((name: 'faceImage' | 'objectImage') => {
+  const handleFileRemove = useCallback((name: 'faceImage' | 'objectImage' | 'poseImage' | 'expressionImage' | 'angleImage') => {
     setFormData((prev) => ({
       ...prev,
       [name]: null,

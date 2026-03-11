@@ -25,14 +25,14 @@ interface PromptFormProps {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onFileRemove: (name: "faceImage" | "objectImage") => void;
+  onFileRemove: (name: "faceImage" | "objectImage" | "poseImage" | "expressionImage" | "angleImage") => void;
   onGenerate: () => void;
   isLoading: boolean;
 }
 
 const FileInput: React.FC<{
   label: string;
-  name: "faceImage" | "objectImage";
+  name: "faceImage" | "objectImage" | "poseImage" | "expressionImage" | "angleImage";
   file: { name: string; data?: string; mimeType?: string } | null;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onFileRemove: (name: "faceImage" | "objectImage") => void;
@@ -45,47 +45,52 @@ const FileInput: React.FC<{
 
   return (
     <InputGroup label={label}>
-      {!file ? (
-        <label
-          htmlFor={name}
-          className="w-full cursor-pointer bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-slate-300 hover:bg-slate-600/70 transition-colors flex justify-center items-center"
-        >
-          <span>{selectLabel}</span>
-          <input
-            id={name}
-            name={name}
-            type="file"
-            onChange={onFileChange}
-            className="sr-only"
-            accept="image/png, image/jpeg"
-          />
-        </label>
-      ) : (
-        <div className="w-full space-y-2">
-          <div className="flex items-center justify-between bg-slate-700 border border-slate-600 rounded-md px-3 py-2">
-            <span className="text-sm text-slate-200 truncate pr-2">{file.name}</span>
-            <button
-              type="button"
-              onClick={() => onFileRemove(name)}
-              className="p-1 rounded-full hover:bg-slate-600 text-slate-400 hover:text-slate-100 transition-colors flex-shrink-0"
-              aria-label={removeLabel}
-            >
-              <RemoveIcon className="w-4 h-4" />
-            </button>
-          </div>
-          {previewUrl && (
-            <div className="bg-slate-700 border border-slate-600 rounded-md p-2">
+      <div className="relative group">
+        {!file ? (
+          <label
+            htmlFor={name}
+            className="w-full cursor-pointer bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg p-4 text-slate-400 hover:bg-slate-700/80 hover:border-blue-500/50 transition-all flex flex-col justify-center items-center gap-2 group-hover:text-slate-300"
+          >
+            <div className="p-3 rounded-full bg-slate-800 text-slate-500 group-hover:text-blue-400 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <span className="text-sm font-medium">{selectLabel}</span>
+            <input
+              id={name}
+              name={name}
+              type="file"
+              onChange={onFileChange}
+              className="sr-only"
+              accept="image/png, image/jpeg"
+            />
+          </label>
+        ) : (
+          <div className="relative w-full aspect-square bg-slate-900 rounded-lg border border-slate-700 overflow-hidden shadow-inner group">
+            {previewUrl && (
               <img
                 src={previewUrl}
                 alt={`${label} preview`}
-                className="w-full h-32 object-contain rounded"
+                className="w-full h-full object-cover"
                 loading="lazy"
                 decoding="async"
               />
+            )}
+            <div className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 text-center">
+              <span className="text-xs text-slate-300 mb-2 truncate w-full px-2">{file.name}</span>
+              <button
+                type="button"
+                onClick={() => onFileRemove(name)}
+                className="bg-red-500/80 hover:bg-red-500 text-white p-2 rounded-full transition-colors shadow-lg"
+                title={removeLabel}
+              >
+                <RemoveIcon className="w-4 h-4" />
+              </button>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </InputGroup>
   );
 };
@@ -146,7 +151,7 @@ const PromptForm: React.FC<PromptFormProps> = React.memo(({
           </select>
         </InputGroup>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <FileInput
             label={t.form.faceImage}
             name="faceImage"
@@ -160,6 +165,33 @@ const PromptForm: React.FC<PromptFormProps> = React.memo(({
             label={t.form.objectImage}
             name="objectImage"
             file={formData.objectImage}
+            onFileChange={onFileChange}
+            onFileRemove={onFileRemove}
+            selectLabel={t.form.selectFile}
+            removeLabel={t.form.removeFile}
+          />
+          <FileInput
+            label={t.form.poseImage}
+            name="poseImage"
+            file={formData.poseImage}
+            onFileChange={onFileChange}
+            onFileRemove={onFileRemove}
+            selectLabel={t.form.selectFile}
+            removeLabel={t.form.removeFile}
+          />
+          <FileInput
+            label={t.form.expressionImage}
+            name="expressionImage"
+            file={formData.expressionImage}
+            onFileChange={onFileChange}
+            onFileRemove={onFileRemove}
+            selectLabel={t.form.selectFile}
+            removeLabel={t.form.removeFile}
+          />
+          <FileInput
+            label={t.form.angleImage}
+            name="angleImage"
+            file={formData.angleImage}
             onFileChange={onFileChange}
             onFileRemove={onFileRemove}
             selectLabel={t.form.selectFile}

@@ -152,6 +152,11 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       { key: 'medium' },
       { key: 'closeUp' },
     ];
+
+    // v1.1: 如果有上傳視角參考圖，額外增加第四個視角
+    if (formData.angleImage) {
+      shotTypes.push({ key: 'specialAngle' });
+    }
     
     const imagePromises = shotTypes.map(async (shot) => {
       const parts: ({ text: string } | { inlineData: { data: string; mimeType: string } })[] = [];
@@ -159,8 +164,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let promptWithInstructions = addShotInstruction(basePrompt, shot.key);
       promptWithInstructions = addReferenceImageInstructions(
         promptWithInstructions,
-        !!formData.faceImage,
-        !!formData.objectImage
+        formData
       );
 
       if (formData.faceImage) {
@@ -176,6 +180,30 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           inlineData: {
             data: formData.objectImage.data,
             mimeType: formData.objectImage.mimeType,
+          },
+        });
+      }
+      if (formData.poseImage) {
+        parts.push({
+          inlineData: {
+            data: formData.poseImage.data,
+            mimeType: formData.poseImage.mimeType,
+          },
+        });
+      }
+      if (formData.expressionImage) {
+        parts.push({
+          inlineData: {
+            data: formData.expressionImage.data,
+            mimeType: formData.expressionImage.mimeType,
+          },
+        });
+      }
+      if (formData.angleImage) {
+        parts.push({
+          inlineData: {
+            data: formData.angleImage.data,
+            mimeType: formData.angleImage.mimeType,
           },
         });
       }
@@ -304,8 +332,9 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const generatedImagesRaw = await Promise.all(imagePromises);
     
-    if (generatedImagesRaw.length !== 3) {
-      throw new Error("Insufficient images generated");
+    // v1.1: 檢查生成的圖片數量是否與要求的視角數量一致
+    if (generatedImagesRaw.length !== shotTypes.length) {
+      throw new Error(`Insufficient images generated. Expected ${shotTypes.length}, got ${generatedImagesRaw.length}`);
     }
 
     return generatedImagesRaw.map(({ label, labelKey, mimeType, base64 }) => {
